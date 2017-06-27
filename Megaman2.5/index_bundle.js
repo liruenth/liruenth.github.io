@@ -77,7 +77,7 @@ var CustomWindow = __webpack_require__(4);
 
 Battle = function(p,megaman) {
     this.active = true;
-    this.enemies = [new Canodum(p.createVector(4,1)), new Canodum(p.createVector(3,0))];
+    this.enemies = [new Canodum(p, p.createVector(4,1)), new Canodum(p, p.createVector(3,0))];
     this.panels = [[6],[6],[6]];
     this.custCount = 0;
     this.fullCustFlashCount = 0;
@@ -85,6 +85,7 @@ Battle = function(p,megaman) {
     this.paused = false;
     this.chips = [];
     this.megaman = megaman;
+    this.p = p; //p5.js
 
     //load panels
     for (var i = 0; i < 6; i++) {
@@ -100,6 +101,14 @@ Battle = function(p,megaman) {
     }
     
     this.custWindow = "";//new CustomWindow();
+
+    this.preload(p);
+};
+
+Battle.prototype.preload = function(p) {
+    for (var i = 0; i < this.enemies.length; i++) {
+        this.enemies[i].preload(p);
+    }
 };
 
 Battle.prototype.keyPressed = function(p) {
@@ -181,6 +190,7 @@ Battle.prototype.draw = function(p) {
     
     for (var i = 0; i < this.enemies.length; i++) {
         if (!this.enemies[i].isDead) {
+            this.enemies[i].act(null, this.megaman.battlePoint);
             this.enemies[i].draw(p);   
         }
     }
@@ -287,9 +297,9 @@ module.exports = Battle;
 
 /***/ }),
 /* 1 */
-/***/ (function(module, exports) {
+/***/ (function(module, exports, __webpack_require__) {
 
-//var img = require('./Images/megamanTransparent.png');
+var img = __webpack_require__(9);
 
 Megaman = function(p) {
     //Navi.call(this);
@@ -312,12 +322,21 @@ Megaman = function(p) {
     this.displayingInfo = false;
     this.x = 0;
     this.y = 0;
+
+    this.preload(p);
 };
 
 //Megaman.prototype = Object.create(Navi.prototype);
+Megaman.prototype.preload = function(p) {
+    this.img = p.loadImage(img);
+};
 
 Megaman.prototype.displayInfo = function() {
     
+};
+
+Megaman.prototype.hurt = function(dmg) {
+    this.hp -= dmg;
 };
 
 Megaman.prototype.shoot = function(enemies) {
@@ -356,9 +375,9 @@ Megaman.prototype.draw = function(battle, p) {
         //p.image(this.img, this.backgroundPoint.x, this.backgroundPoint.y, this.imgWidth, this.imgHeight);
     }
     else {
-        //p.image(this.img, this.x, this.y, this.imgWidth, this.imgHeight); 
-        p.fill(0,0,255);  
-        p.rect(this.x, this.y, this.imgWidth, this.imgHeight); 
+        p.image(this.img, this.x, this.y, this.imgWidth, this.imgHeight); 
+        // p.fill(0,0,255);  
+        // p.rect(this.x, this.y, this.imgWidth, this.imgHeight); 
         if (this.charging) {
             this.chargeCount++;   
         }
@@ -35644,7 +35663,7 @@ module.exports = {
 };
 },{}]},{},[33])(33)
 });
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(9)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(11)))
 
 /***/ }),
 /* 4 */
@@ -35994,9 +36013,9 @@ module.exports = Panel;
 /***/ (function(module, exports, __webpack_require__) {
 
 var Virus = __webpack_require__(7);
-//var img = require('./Images/cannon.png');
+var img = __webpack_require__(10);
 
-var Canodumb = function(loc) {
+var Canodumb = function(p, loc) {
                     //name, hp, atk, rewards, img, loc, size, element, actingTime, attackTime
     Virus.call(this, "Canodumb", 50, 10, {s:["Cannon C"]},"img", loc, 50, "none", 0, 5);
     
@@ -36005,37 +36024,40 @@ var Canodumb = function(loc) {
     this.coolCount = 10;
     this.cursorTime = 10;
     this.cursorCount = 10;
-    this.cursorLoc = this.loc;
+    this.cursorLoc = p.createVector(this.loc.x, this.loc.y);
     this.shooting = false;
+    this.drawLoc = p.createVector(this.loc.x * 67 + 7, this.loc.y * 46 + 150);
+    this.panelSize = p.createVector(67,46);
+    this.p = p;
     
+    Canodumb.prototype.preload = function(p) {
+        this.img = p.loadImage(img);
+    };
     
     Canodumb.prototype.draw = function(p) {
-        var y = this.loc.y * 46 + 150;
-        var x = this.loc.x * 67 + 7;
         if (this.attacking) {
             if (this.shooting) {
                 
             } else {
                 this.drawCursor(this.cursorLoc, p);
             }
-        } else {
-            // p.img(this.img, this.loc.x, this.loc.y);
-            p.fill(0,255,0);
-            p.rect(x, y, 50,80);
-            p.fill(255,0,0);
-            p.text(this.hp, x, y);
-        }
+        } 
+        p.image(this.img, this.drawLoc.x, this.drawLoc.y, 50, 80);
+        // p.fill(0,255,0);
+        // p.rect(x, y, 50,80);
+        p.fill(255,0,0);
+        p.text(this.hp, this.drawLoc.x, this.drawLoc.y);
     };
     
     Canodumb.prototype.drawCursor = function(cursorLoc, p) {
          p.noFill();
          p.stroke(255,255,0);
-         p. ect(cursorLoc.x, cursorLoc.y, 10, 10);
+         p.rect(this.cursorLoc.x * 67 + 7, (this.cursorLoc.y + 1) * 46 + 153, 50, 32);
     };
     
     Canodumb.prototype.move = function(field, megaLoc) {
         var y = this.loc.y;
-        var my = megamanLoc.y;
+        var my = megaLoc.y;
         if (y === my) {
             if (this.coolCount >= this.coolDown) {
                 this.attacking = true;
@@ -36050,25 +36072,25 @@ var Canodumb = function(loc) {
             this.shoot(megaLoc);
         }
         if (this.cursorCount >= this.cursorTime) {
-            this.cursorLoc.y--;
+            this.cursorLoc.x--;
             this.cursorCount = 0;
-            if (megamanLoc === this.cursorLoc) {
+            if (megaLoc.x === this.cursorLoc.x && megaLoc.y === this.cursorLoc.y) {
                 this.shooting = true;
-                this.cursorLoc = this.loc;
+                this.cursorLoc = this.p.createVector(this.loc.x, this.loc.y);
                 this.cursorCount = this.cursorTime;
-            } else if (this.cursorLoc.y < 0) {
+            } else if (this.cursorLoc.x < 0) {
                 this.attacking = false;
-                this.cursorLoc = this.loc;
                 this.cursorCount = this.cursorTime;
+                this.cursorLoc = this.p.createVector(this.loc.x, this.loc.y);
             }
         }
         this.cursorCount++;
     };
     
-    Canodumb.prototype.shoot = function() {
+    Canodumb.prototype.shoot = function(megaLoc) {
         if (this.attackCount >= this.attackTime) {
-            if (megamanLoc.y === this.cursorLoc.y) {
-                megaman.hurt(this.atk);   
+            if (megaLoc.y === this.cursorLoc.y) {
+                console.log("megaman.hurt(this.atk);");
             }
             this.attackCount = 0;
             this.shooting = false;
@@ -36169,10 +36191,13 @@ var naviCust;
 var battle;
 var sketch = function(p) {
 
+	p.preload = function() {
+		battle = new Battle(p,new Megaman(p));
+	};
+
 	p.setup = function() {
 		p.createCanvas(400,400);
 		//naviCust = new NaviCust();
-		battle = new Battle(p,new Megaman(p));
 	};
 
 	p.draw = function() {
@@ -36197,6 +36222,18 @@ new p5(sketch);
 
 /***/ }),
 /* 9 */
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports = __webpack_require__.p + "0aaa94e9634a839f5c1d60fe9b67c15c.png";
+
+/***/ }),
+/* 10 */
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports = __webpack_require__.p + "367c887e3b824357a376c69918ea9855.png";
+
+/***/ }),
+/* 11 */
 /***/ (function(module, exports) {
 
 var g;
