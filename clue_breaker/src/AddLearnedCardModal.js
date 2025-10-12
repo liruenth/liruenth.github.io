@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
 import MyModal from './MyModal';
-import UnknownCardSelector from './UnknownCardSelector';
+// import UnknownCardSelector from './UnknownCardSelector';
+import AllCardSelector from './AllCardSelector';
 
-function AddLearnedCardModal ({ isOpen, title, onSubmit, onClose, playerNames, unknownCards }) {
+function AddLearnedCardModal ({ isOpen, title, onSubmit, onClose, playerNames }) {
   const [showValidation, setShowValidation] = useState(false);
-  const playerOptions = playerNames.map(playerName => <option value={playerName}>{playerName}</option>);
+  const playerOptions = playerNames.map(playerName => 
+    <option key={playerName} value={playerName}>{playerName}</option>
+  );
 
   const validateSubmit = (e) => {
     e.preventDefault();
     const player = e.target.player.value;
     const newLearned = e.target.learned.value;
-   
-    console.log("addCardModal submit player");
-    console.log(player);
 
     if (newLearned === "" || player === "") {
       setShowValidation(true);
@@ -43,7 +43,7 @@ function AddLearnedCardModal ({ isOpen, title, onSubmit, onClose, playerNames, u
               <option value="">--Player--</option>
               {playerOptions}
             </select>
-            <UnknownCardSelector fieldName={"learned"} fieldId={"learned"} unknownCards={unknownCards} />
+            <AllCardSelector fieldName={"learned"} fieldId={"learned"} />
           </div>
           {showValidation ? 
             <span style={{ color: "red" }}>

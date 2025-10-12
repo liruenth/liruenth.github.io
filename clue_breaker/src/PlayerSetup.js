@@ -44,7 +44,11 @@ function PlayerSetup({setPlayerData}) {
     return (
       <div style={{marginBottom: "0.5em"}}>
         <label style={{marginRight: "0.5em"}}>Player {id}</label>
-        <input name={`player${id}`} type="text" className="player-entry" style={nameInputStyles}/>
+        {
+          id === 1
+            ? <input name={`player${id}`} type="text" className="player-entry" style={nameInputStyles} value="Me" disabled/>
+            : <input name={`player${id}`} type="text" className="player-entry" style={nameInputStyles}/>
+        }
       </div>
     )
   })

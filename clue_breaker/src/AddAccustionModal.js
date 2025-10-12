@@ -2,13 +2,25 @@ import React, { useState } from 'react';
 import MyModal from './MyModal';
 import { SUSPECTS, WEAPONS, ROOMS } from './Constants';
 
-function AddAccusationModal ({isOpen, title, onSubmit, onClose, playerNames}) {
+function AddAccusationModal ({isOpen, title, onSubmit, onClose, playerNames, defaultValues = {}}) {
   const [showValidation, setShowValidation] = useState(false);
 
-  const suspectOptions = SUSPECTS.map(suspect => <option value={suspect}>{suspect}</option>);
-  const weaponOptions = WEAPONS.map(weapon => <option value={weapon}>{weapon}</option>);
-  const roomOptions = ROOMS.map(room => <option value={room}>{room}</option>);
-  const playerOptions = playerNames.map(playerName => <option value={playerName}>{playerName}</option>);
+  const suspectOptions = SUSPECTS.map(suspect => 
+    <option key={suspect} value={suspect}>{suspect}</option>
+  );
+  const weaponOptions = WEAPONS.map(weapon => 
+    <option key={weapon} value={weapon}>{weapon}</option>
+  );
+  const roomOptions = ROOMS.map(room => 
+    <option key={room} value={room}>{room}</option>
+  );
+  const playerOptions = playerNames.map(playerName => 
+    <option key={playerName} value={playerName}>{playerName}</option>
+  );
+  const cardTypes = ["suspect", "weapon", "room"];
+  const shownCardOptions = cardTypes.map(type =>
+    <option key={type} value={type}>{type}</option>
+  );
 
   const selectStyles = {
     margin: "0.5em",
@@ -25,6 +37,7 @@ function AddAccusationModal ({isOpen, title, onSubmit, onClose, playerNames}) {
     const weapon = e.target.weapons.value;
     const room = e.target.rooms.value;
     const stoppedBy = e.target.stoppedBy.value;
+    const shownCard = e.target.shownCard.value;
     if (accuser === "" ||
       suspect === "" ||
       weapon === "" ||
@@ -33,7 +46,9 @@ function AddAccusationModal ({isOpen, title, onSubmit, onClose, playerNames}) {
     ) {
       setShowValidation(true);
     } else {
-      onSubmit({player: accuser, suspect, weapon, room, stoppedBy});
+      console.log("submitAddModal");
+      console.log(defaultValues);
+      onSubmit({player: accuser, suspect, weapon, room, stoppedBy, shownCard});
       setShowValidation(false);
     }
   }
@@ -47,30 +62,34 @@ function AddAccusationModal ({isOpen, title, onSubmit, onClose, playerNames}) {
       formFields={
         <div>
           <div>
-            <select name="accuser" id="accuser" style={selectStyles} >
+            <select name="accuser" id="accuser" style={selectStyles} defaultValue={defaultValues.player || ""} >
               <option value="">--Accuser--</option>
               {playerOptions}
             </select>
-            <select name="suspects" id="suspects" style={selectStyles}>
+            <select name="suspects" id="suspects" style={selectStyles} defaultValue={defaultValues.suspect || ""} >
               <option value="">--Suspect--</option>
               {suspectOptions}
             </select>
-            <select name="weapons" id="weapons" style={selectStyles} >
+            <select name="weapons" id="weapons" style={selectStyles} defaultValue={defaultValues.weapon || ""} >
               <option value="">--Weapon--</option>
               {weaponOptions}
             </select>
-            <select name="rooms" id="rooms" style={selectStyles} >
+            <select name="rooms" id="rooms" style={selectStyles} defaultValue={defaultValues.room || ""} >
               <option value="">--Room--</option>
               {roomOptions}
             </select>
-            <select name="stopped-by" id="stoppedBy" style={selectStyles} >
+            <select name="stopped-by" id="stoppedBy" style={selectStyles} defaultValue={defaultValues.stoppedBy || ""} >
               <option value="">--Stopped By--</option>
               {playerOptions}
+            </select>
+            <select name="shown-card" id="shownCard" style={selectStyles} defaultValue={defaultValues.shownCard || ""} >
+              <option value="">--Shown--</option>
+              {shownCardOptions}
             </select>
           </div>
           {showValidation ? 
             <span style={{color: "red"}}>
-              All fields need a value.
+              All fields except shown card need a value.
               <br />
               <i>Stopped By</i> should be accuser's name if not stopped.
             </span> 

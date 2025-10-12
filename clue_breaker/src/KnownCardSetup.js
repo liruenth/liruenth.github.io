@@ -2,16 +2,27 @@ import React from 'react';
 import { ALL_CARDS } from "./Constants";
 import AllCardSelector from './AllCardSelector';
 
-function KnownCardSetup({setKnownData, numPlayers}) {
+function KnownCardSetup({setKnownData, playerData}) {
 
   const maxCardCount = ALL_CARDS.length - 3;
-  const remainingCardCount = maxCardCount % numPlayers;
+  const remainingCardCount = maxCardCount % playerData.length;
+  const cardsPerPlayer = Math.floor(maxCardCount / playerData.length)
 
-  let cardFields = [];
+  let knownCardFields = [];
   for (let i = 0; i < remainingCardCount; i++) {
-    cardFields.push(
+    knownCardFields.push(
       <React.Fragment>
         <AllCardSelector fieldName={`known-${i}`} fieldId={`known-${i}`} />
+        <br />
+      </React.Fragment>
+    )
+  }
+  
+  let myCardFields = [];
+  for (let i = 0; i < cardsPerPlayer; i++) {
+    myCardFields.push(
+      <React.Fragment>
+        <AllCardSelector fieldName={`myCard-${i}`} fieldId={`myCard-${i}`} />
         <br />
       </React.Fragment>
     )
@@ -22,12 +33,19 @@ function KnownCardSetup({setKnownData, numPlayers}) {
 
     let knownValues = [];
     for (let i = 0; i < remainingCardCount; i++) {
-      knownValues.push({name: e.target[`known-${i}`].value})
+      knownValues.push(e.target[`known-${i}`].value);
+    }
+
+    let myCardValues = [];
+    for (let i = 0; i < cardsPerPlayer; i++) {
+      myCardValues.push(e.target[`myCard-${i}`].value);
     }
     
     setKnownData({
       knownCards: knownValues,
-      cardsPerPlayer: Math.floor(maxCardCount / numPlayers),
+      myCards: myCardValues,
+      cardsPerPlayer,
+      playerData,
     });
   };
 
@@ -59,7 +77,9 @@ function KnownCardSetup({setKnownData, numPlayers}) {
             "Enter the known cards."
           }
         </h3>
-        { cardFields }
+        { knownCardFields }
+        <h3>Enter own cards.</h3>
+        { myCardFields }
         <br />
         <input type="submit" value="Submit"  style={buttonStyles}/>
       </form>

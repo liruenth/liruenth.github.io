@@ -1,12 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
 import MyModal from './MyModal';
-import ReactScrollableList from "react-scrollable-list";
+import AddAccusationModal from './AddAccustionModal';
 
-function AccusationListModal ({ isOpen, title, onSubmit, onClose, accusations }) {
+function AccusationListModal ({ isOpen, title, onSubmit, onClose, accusations = [], playerNames, setGameData }) {
+  const [editAccusationModalIsOpen, setEditAccusationModalIsOpen] = useState(null);
+
+  const editAccusation = (accusationData) => {
+    accusationData = {...accusationData, id: editAccusationModalIsOpen.id};
+    setEditAccusationModalIsOpen(null);
+
+    const gameDataAccusations = [...accusations];
+    gameDataAccusations[accusationData.id - 1] = accusationData;
+
+    setGameData(prevGameData => {
+      return ({
+        ...prevGameData,
+        accusations: gameDataAccusations,
+      });
+    });
+  }  
 
   const wrapperStyles = {
     height: '400px',
-    overflow: 'scroll',
+    overflow: 'auto',
   }
 
   const tableStyles = {
@@ -14,63 +30,67 @@ function AccusationListModal ({ isOpen, title, onSubmit, onClose, accusations })
     tableLayout: 'fixed',
     overflow: 'auto',
     borderCollapse: 'collapse',
+    whiteSpace: "nowrap",
   }
- 
-  const accusationListStyles = {
-    margin: "0.5em",
-    backgroundColor: "lightblue",
-    padding: "0.5em",
-    border: "none",
-    borderRadius: "5px",
-    border: '4px solid black',
-  };
 
-  const accusationStyles = {
-    textAlign: 'center',
-    backgroundColor: "yellow",
-    // boxShadow: '0 4px 8px 0 rgba(0,0,0,0.2)',
-    padding: '0 25px',
-    fontSize: '16px',
-    height: '32px',
-    lineHeight: '32px',
-    margin: '5px',
-  };
-
-  const accusationList = accusations.map(accusation => 
-    <tr style={accusationListStyles}>
-      <td style={accusationStyles}>{accusation.id}</td>
-      <td style={accusationStyles}>{accusation.player}</td>
-      <td style={accusationStyles}>{accusation.suspect}</td>
-      <td style={accusationStyles}>{accusation.weapon}</td>
-      <td style={accusationStyles}>{accusation.room}</td>
-      <td style={accusationStyles}>{accusation.stoppedBy}</td>
+  const accusationList = accusations.length > 0 ? accusations.map(accusation => 
+    <tr className={"tableRow"} key={accusation.id}>
+      <td className={"tableCell"}>{accusation.id}</td>
+      <td className={"tableCell"}>{accusation.player}</td>
+      <td className={"tableCell"}>{accusation.suspect}</td>
+      <td className={"tableCell"}>{accusation.weapon}</td>
+      <td className={"tableCell"}>{accusation.room}</td>
+      <td className={"tableCell"}>{accusation.stoppedBy}</td>
+      <td className={"tableCell"}>{accusation[accusation.shownCard]}</td>
+      <td onClick={() => setEditAccusationModalIsOpen(accusation)}>✎</td>
     </tr>
-  );
+  ) : null;
   
   return (
-    <MyModal 
-      isOpen={isOpen}
-      title={title}
-      onSubmit={onSubmit}
-      onClose={onClose}
-      formFields={
-        <div style={wrapperStyles}>
-          <table style={tableStyles}>
-            <tbody>
-              <tr>
-                <th>#</th>
-                <th>Accuser</th>
-                <th>Suspect</th>
-                <th>Weapon</th>
-                <th>Room</th>
-                <th>Stopped By</th>
-              </tr>
-              {accusationList}
-            </tbody>
-          </table>
-        </div>
+    <div>
+      <MyModal 
+        isOpen={isOpen}
+        title={title}
+        onSubmit={onSubmit}
+        onClose={onClose}
+        formFields={
+          <div style={wrapperStyles}>
+            {
+              accusations.length > 0 ?
+                <div>
+                  <table style={tableStyles}>
+                    <tbody>
+                      <tr>
+                        <th>#</th>
+                        <th>Accuser</th>
+                        <th>Suspect</th>
+                        <th>Weapon</th>
+                        <th>Room</th>
+                        <th>Stopped By</th>
+                        <th>shownCard</th>
+                        <th>edit</th>
+                      </tr>
+                      {accusationList}
+                    </tbody>
+                  </table>
+                </div>
+                : "No Accusations Made"
+            }
+          </div>
+        }
+      />
+
+      {!!editAccusationModalIsOpen &&
+        <AddAccusationModal 
+          isOpen={!!editAccusationModalIsOpen}
+          title={`Edit Accusation for a player`}
+          onSubmit={editAccusation}
+          onClose={() => setEditAccusationModalIsOpen(null)}
+          playerNames={playerNames}
+          defaultValues={editAccusationModalIsOpen}
+        />
       }
-    />
+    </div>
   );
 }
 

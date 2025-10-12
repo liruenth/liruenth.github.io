@@ -3,6 +3,8 @@ import Modal from 'react-modal';
 
 const customStyles = {
   content: {
+    width: "fit-content",
+    maxWidth: "100%",
     top: '50%',
     left: '50%',
     right: 'auto',

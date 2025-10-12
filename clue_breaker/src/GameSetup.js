@@ -5,17 +5,10 @@ import KnownCardSetup from './KnownCardSetup';
 function GameSetup({setGameData}) {
   const [playerData, setPlayerData] = useState(null);
 
-  const handleSubmitKnownCards = (knownData) => {
-    setGameData({
-      players: playerData,
-      ...knownData,
-    })
-  };
-
   return (
     <div>
       {!!playerData ? 
-        <KnownCardSetup setKnownData={handleSubmitKnownCards} numPlayers={playerData.length}/> :
+        <KnownCardSetup setKnownData={setGameData} playerData={playerData}/> :
         <PlayerSetup setPlayerData={setPlayerData}/>
       }
     </div>
