@@ -1,0 +1,106 @@
+/* Mirrors ROW_HEIGHT in AGGrid.jsx — the buttons under the sheet are sized to
+   match a table row, and the space reserved for them is derived from it. */
+:root {
+  --sheet-row-height: 28px;
+  --sheet-footer-padding: 16px;
+}
+
+.grid-container {
+  /* Button row plus the padding above and below it */
+  --grid-footer-space: calc(
+    var(--sheet-row-height) + (2 * var(--sheet-footer-padding))
+  );
+
+  /* All the height we can take once the buttons have their space.
+     --grid-available is what's left below the grid's own top edge, measured in
+     AGGrid.jsx; the fallback covers the render before it's been measured. */
+  --grid-cap: calc(var(--grid-available, 100svh) - var(--grid-footer-space));
+
+  /* What's left for rows after the header and horizontal scrollbar, rounded
+     down to whole rows. Without the rounding the leftover pixels render as a
+     sliver of a row at the bottom, which reads as the last row being cut off
+     by the scrollbar. --grid-chrome comes from AGGrid.jsx. */
+  --grid-rows-cap: round(
+    down,
+    calc(var(--grid-cap) - var(--grid-chrome)),
+    var(--sheet-row-height)
+  );
+
+  width: 100%;
+
+  /* Grow to fit every row, but never past the viewport. Capping the height (as
+     opposed to letting the grid auto-size) is what keeps AG Grid in its normal
+     layout, where the body scrolls vertically under a frozen header row. */
+  height: min(
+    var(--grid-natural-height),
+    calc(var(--grid-chrome) + var(--grid-rows-cap))
+  );
+}
+
+/* There isn't room for a horizontal scrollbar on a small screen, so drop it and
+   give the strip it reserved back to the rows — swipe still scrolls the sheet. */
+@media (max-width: 1024px) {
+  .grid-container :is(
+    .ag-grid-viewport,
+    .ag-grid-scrollable-area,
+    .ag-grid-scrolling-container,
+    .ag-body-horizontal-scroll-viewport
+  ) {
+    scrollbar-width: none;
+  }
+
+  .grid-container :is(
+    .ag-grid-viewport,
+    .ag-grid-scrollable-area,
+    .ag-grid-scrolling-container,
+    .ag-body-horizontal-scroll-viewport
+  )::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Hiding the bar leaves the strip behind, and that strip is what clips the
+     last row. AG Grid sizes these from the platform's scrollbar thickness at
+     runtime, so !important is needed to collapse them. The height the grid
+     reports back to AGGrid.jsx then measures 0, which keeps its height math
+     in step on its own. */
+  .grid-container :is(
+    .ag-body-horizontal-scroll,
+    .ag-body-horizontal-scroll-viewport
+  ) {
+    height: 0 !important;
+    min-height: 0 !important;
+  }
+}
+
+/* Fills the space .grid-container leaves free above */
+.sheet-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: var(--sheet-footer-padding) 0;
+  box-sizing: border-box;
+}
+
+.sheet-footer button {
+  font: inherit;
+  font-size: 16px;
+  height: var(--sheet-row-height);
+  padding: 0 14px;
+  border-radius: 5px;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.sheet-footer button:hover {
+  border-color: var(--accent-border);
+}
+
+.sheet-footer button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

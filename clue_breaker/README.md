@@ -1,21 +1,3 @@
-Fixes
-- my accusations conflicting with learned cards (add learned card to accusation when i make them) (also add to data type and update when cards are learned?)
-
-Implement
-- cache / cookie (done)
-- editing accusations (done)
-- deleting learned cards (basically done. Not stored though but whatevs)
-- auto add "me" player (done)
-- alternate display showing all cards for each user with an X, O, ?, or blank next to each for don't have, have, maybe, no data (or maybe just one display but each persons name?) (done)
-- update solver
-- add new button to `Reapply Accusations`
-- only allow (unknown times 3) possibles per person
-- tests
-
-
-
-
-
 
 
 

@@ -1,0 +1,72 @@
+.add-player-modal {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  min-width: 280px;
+}
+
+.add-player-modal::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.add-player-modal h2 {
+  margin-top: 0;
+}
+
+.add-player-modal form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.add-player-modal input[type='text'] {
+  font: inherit;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.add-player-modal input[type='text']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.modal-error {
+  font-size: 15px;
+  color: var(--accent);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.modal-actions button {
+  font: inherit;
+  font-size: 16px;
+  height: var(--sheet-row-height);
+  padding: 0 14px;
+  border-radius: 5px;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.modal-actions button:hover:not(:disabled) {
+  border-color: var(--accent-border);
+}
+
+.modal-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

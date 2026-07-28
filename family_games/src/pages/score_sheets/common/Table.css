@@ -1,0 +1,46 @@
+/* Container handles the outer scroll bounds */
+.table-container {
+  max-height: 400px;
+  max-width: 600px;
+  overflow: auto;
+  border: 1px solid #ccc;
+}
+
+table {
+  border-collapse: separate; /* Required for sticky borders to render properly */
+  border-spacing: 0;
+  width: 100%;
+}
+
+th, td {
+  padding: 12px;
+  border-bottom: 1px solid #ddd;
+  border-right: 1px solid #ddd;
+  background-color: #fff; /* Opaque background prevents overlapping text transparency */
+  white-space: nowrap;
+}
+
+/* 1. Freeze the Top Row Headers */
+.frozen-row {
+  position: sticky;
+  top: 0;
+  background-color: #f1f1f1;
+  z-index: 2;
+}
+
+/* 2. Freeze the First Column */
+.frozen-col {
+  position: sticky;
+  left: 0;
+  background-color: #f9f9f9;
+  z-index: 2;
+}
+
+/* 3. Freeze the Intersection (Top-Left Cell) */
+.frozen-corner {
+  position: sticky;
+  top: 0;
+  left: 0;
+  background-color: #e2e2e2;
+  z-index: 3; /* Highest z-index so it sits on top of row and column headers */
+}
