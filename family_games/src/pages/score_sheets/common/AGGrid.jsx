@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { AllCommunityModule, themeBalham, themeAlpine, themeQuartz } from 'ag-grid-community';
 import { AgGridProvider, AgGridReact } from 'ag-grid-react';
+import { rowTotal, columnComplete, sortedByTotal } from './scoring';
 import './AGGrid.css';
 
 // import 'ag-grid-community/styles/ag-grid.css';
@@ -8,10 +9,31 @@ import './AGGrid.css';
 
 const modules = [AllCommunityModule];
 
+// Balham only borders the header row, so ask for column borders through the body
+// as well. Built once — a new theme object on each render re-inits the grid.
+const gridTheme = themeBalham.withParams({ columnBorder: true });
+
 // Set explicitly rather than left to the theme so the height math below can
 // know what the grid will actually render.
 const ROW_HEIGHT = 28;
 const HEADER_HEIGHT = 32;
+
+// A 100px floor reads well on a desktop, but on a phone the two pinned columns
+// alone would take most of the screen and leave the rounds no room, so the floor
+// drops on small screens. Kept in step with the breakpoint in AGGrid.css —
+// minWidth is a column value, so it can't come from the media query itself.
+const MIN_COL_WIDTH = 100;
+const MIN_COL_WIDTH_SMALL = 48;
+const SMALL_SCREEN = '(max-width: 1024px)';
+
+// The pinned columns hold a name and a running total — fixed content that
+// doesn't get wider with the screen. They're sized to it and kept out of the
+// flex share, so the spare width goes to the round columns instead of padding
+// these two out.
+const PLAYER_COL_WIDTH = 200;
+const PLAYER_COL_WIDTH_SMALL = 64;
+const TOTAL_COL_WIDTH = 100;
+const TOTAL_COL_WIDTH_SMALL = 64;
 
 // A grid-driven change ('data') would loop back through rowData, so only
 // write on edits the user made themselves. Our own total write uses its own
@@ -19,13 +41,17 @@ const HEADER_HEIGHT = 32;
 const MANUAL_SOURCES = ['edit', 'paste', 'undo', 'redo'];
 const TOTAL_SOURCE = 'rowTotal';
 
-// Editors hand back strings, and unplayed rounds are blank, so skip anything
-// that isn't a real number rather than letting it poison the sum with NaN.
-function rowTotal(playerScores, cols) {
-  return cols.reduce((sum, col) => {
-    const score = Number(playerScores.get(col));
-    return Number.isFinite(score) ? sum + score : sum;
-  }, 0);
+
+// Background for a data row, chosen from its running total. The bands are still
+// to be decided, so every path returns null for now and rows keep the theme's
+// own background.
+function rowBackground(total) {
+  if (!Number.isFinite(total)) {
+    return null;
+  }
+
+  // TODO: pick the colours — e.g. leader vs middle of the pack vs trailing
+  return null;
 }
 
 function buildRows(scoreData, cols) {
@@ -37,40 +63,65 @@ function buildRows(scoreData, cols) {
   }));
 }
 
-const AGGrid = ({scoreData, cols, setScoreData}) => {
+const AGGrid = ({scoreData, cols, setScoreData, autoSortTable, onReorder}) => {
   const containerRef = useRef(null);
   const [layout, setLayout] = useState({ scrollbar: 0, available: null });
+
+  const [smallScreen, setSmallScreen] = useState(() => window.matchMedia(SMALL_SCREEN).matches);
+
+  useEffect(() => {
+    const query = window.matchMedia(SMALL_SCREEN);
+    const update = (event) => setSmallScreen(event.matches);
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
 
   const defaultColDef = useMemo(() => {
     return {
       resizable: false,
-      // flex: 1,
-      maxWidth: 100
+      // Share out the spare width evenly, but never shrink below the floor.
+      // Under that total the grid scrolls horizontally instead.
+      flex: 1,
+      minWidth: smallScreen ? MIN_COL_WIDTH_SMALL : MIN_COL_WIDTH
     };
+  }, [smallScreen]);
+
+  // Rows are styled by their total, which getRowStyle only reads when a row is
+  // drawn — see the redraw in onCellValueChanged.
+  const getRowStyle = useCallback((params) => {
+    const background = rowBackground(params.data?.total);
+    return background ? { background } : undefined;
   }, []);
 
-  const autoSizeStrategy = useMemo(() => { 
-    return {
-      type: 'fitCellContents',
-    };
-  }, []);
-  
-  const [columnDefs, setColumnDefs] = useState([
-    // { field: 'make2', editable: true },
-    // { field: 'model', editable: true },
-    // { field: 'price', editable: true }
-    { field: 'player', pinned: 'left' },
-    ...cols.map((col, cIdx) => ({ field: col, editable: true })),
-    { field: 'total', pinned: 'right' }
-  ]);
+  // { field: 'make2', editable: true },
+  // { field: 'model', editable: true },
+  // { field: 'price', editable: true }
+  //
+  // flex: 0 opts the pinned columns out of the width sharing, and their own
+  // minWidth overrides the floor in defaultColDef, which would otherwise hold
+  // them open to the round columns' minimum.
+  const columnDefs = useMemo(() => {
+    const playerWidth = smallScreen ? PLAYER_COL_WIDTH_SMALL : PLAYER_COL_WIDTH;
+    const totalWidth = smallScreen ? TOTAL_COL_WIDTH_SMALL : TOTAL_COL_WIDTH;
+
+    return [
+      { field: 'player', pinned: 'left', flex: 0, width: playerWidth, minWidth: playerWidth },
+      ...cols.map((col) => ({ field: col, editable: true })),
+      { field: 'total', pinned: 'right', flex: 0, width: totalWidth, minWidth: totalWidth }
+    ];
+  }, [cols, smallScreen]);
 
   // { make2: "Toyota", model: "Celica", price: 35000 },
   // { make2: "Ford", model: "Mondeo", price: 32000 },
   // { make2: "Porsche", model: "Boxster", },
   //
-  // Keyed on the Map's identity, which only changes when the roster does, so
-  // adding a player rebuilds the rows while cell edits leave them untouched.
+  // Keyed on the Map's identity, which changes when the roster or the row order
+  // does — so adding a player or re-ranking rebuilds the rows, while cell edits
+  // (which mutate in place) leave them untouched.
   const rowData = useMemo(() => buildRows(scoreData, cols), [scoreData, cols]);
+
+  // Lets AG Grid move existing rows on a re-sort instead of rebuilding them all
+  const getRowId = useCallback((params) => params.data.player, []);
 
   const onCellValueChanged = useCallback((event) => {
     if (!MANUAL_SOURCES.includes(event.source)) {
@@ -87,8 +138,22 @@ const AGGrid = ({scoreData, cols, setScoreData}) => {
     playerScores.set(col, event.newValue);
     // Totals stay derived — recomputed from the row rather than stored
     event.node.setDataValue('total', rowTotal(playerScores, cols), TOTAL_SOURCE);
+    // Setting a value repaints the cell but not the row, so the background has
+    // to be asked for again now the total it depends on has moved.
+    event.api.redrawRows({ rowNodes: [event.node] });
+
+    // Re-rank once the edit leaves no blanks in the column — the cell that
+    // completes a round needn't be the bottom one. Handing the reordered sheet up
+    // rather than sorting the grid means the order is part of the saved data, so
+    // it survives a refresh, and it stays a one-off: rows settle and then hold
+    // still through the next column instead of re-shuffling on every edit.
+    if (autoSortTable && onReorder && columnComplete(scoreData, col)) {
+      onReorder(sortedByTotal(scoreData, cols));
+      return;
+    }
+
     setScoreData(new Map(scoreData));
-  }, [scoreData, cols, setScoreData]);
+  }, [scoreData, cols, setScoreData, autoSortTable, onReorder]);
 
   const measureLayout = useCallback(() => {
     const container = containerRef.current;
@@ -154,15 +219,16 @@ const AGGrid = ({scoreData, cols, setScoreData}) => {
     >
       <AgGridProvider modules={modules}>
         <AgGridReact
-          theme={themeBalham}
+          theme={gridTheme}
           // theme={themeAlpine}
           // theme={themeQuartz}
-          autoSizeStrategy={autoSizeStrategy}
           defaultColDef={defaultColDef}
           columnDefs={columnDefs}
           rowData={rowData}
+          getRowId={getRowId}
           rowHeight={ROW_HEIGHT}
           headerHeight={HEADER_HEIGHT}
+          getRowStyle={getRowStyle}
           onCellValueChanged={onCellValueChanged}
           onFirstDataRendered={measureLayout}
           onGridSizeChanged={measureLayout}

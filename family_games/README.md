@@ -1,11 +1,12 @@
 TODO
-- finish styling / implementing AGGrid
-- implement startgGame
-- implement addPlayer
 - implement reset mechanic (as well as a guard against it)
 - implement saving data to AWS
+- implement mormon bridge (with auto progress behavior)
 - implement pull wins from AWS
-
+- implementing groups would require the following algorithm
+   - divide rows by groups and grab the remainder
+   - use the floor + 1 for each remainder rows
+   - use the floor for every row after
 
 run test server with `npm run dev`
 
