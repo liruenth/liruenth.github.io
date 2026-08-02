@@ -22,8 +22,7 @@ async function fetchFamilyPlayers(familyName) {
   return res.json();
 }
 
-function StartNewGame({ onConfirm }) {
-  const [familyName, setFamilyName] = useState('');
+function StartNewGame({ familyName, setFamilyName, onConfirm }) {
   const [familyInput, setFamilyInput] = useState('');
   const [players, setPlayers] = useState([]);
   const [selected, setSelected] = useState([]);

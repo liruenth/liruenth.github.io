@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import ContractRummy from './contract_rummy/ContractRummy';
 import MormonBridge from './mormon_bridge/MormonBridge';
 import StartNewGame from './common/StartNewGame';
+import { submitScores } from '../../api/routes';
 
 function mapReplacer(key, value) {
   if (value instanceof Map) {
@@ -25,6 +26,25 @@ function ScoreSheet() {
 
     return null
   });
+  const [familyName, setFamilyName] = useState(() => {
+    let savedFamilyName = sessionStorage.getItem('familyName');
+    if (!!savedFamilyName) {
+      return savedFamilyName;
+    }
+
+    return ''
+  });
+
+  // Cleared as well as saved, unlike the others: changing family resets this to
+  // empty, and a stale name left behind would come back on the next refresh.
+  useEffect(() => {
+    if (!!familyName) {
+      sessionStorage.setItem('familyName', familyName);
+    } else {
+      sessionStorage.removeItem('familyName');
+    }
+  }, [familyName]);
+
   const [players, setPlayers] = useState(() => {
     // A restored score sheet is keyed by player name, so the roster is its keys
     if (scoreData) {
@@ -35,7 +55,6 @@ function ScoreSheet() {
   });
   
   useEffect(() => {
-    console.log('savingScoreData');
     if (!!scoreData) {
       sessionStorage.setItem('scoreData', JSON.stringify(scoreData, mapReplacer));
     }
@@ -56,8 +75,13 @@ function ScoreSheet() {
     }
   }, [gameType]);
 
+  // Sends the finished game to DynamoDB. The sheet is passed in rather than read
+  // from state: the game holds the live copy, and ours only catches up once a
+  // cell edit pushes it back here. Errors are left to the caller to show.
+  const submitGame = (sheet) => submitScores(familyName, gameType, sheet ?? scoreData);
+
    return (
-    
+
     <>
     {
       !gameType ?
@@ -81,9 +105,9 @@ function ScoreSheet() {
           </button>
         </section>
       : players.length === 0 ?
-        <StartNewGame onConfirm={setPlayers}/>
+        <StartNewGame familyName={familyName} setFamilyName={setFamilyName} onConfirm={setPlayers}/>
       : gameType === "CR" ?
-        <ContractRummy players={players} scoreData={scoreData} setScoreData={setScoreData}/>
+        <ContractRummy players={players} scoreData={scoreData} setScoreData={setScoreData} onSubmitGame={submitGame}/>
       : <MormonBridge players={players} setScoreData={setScoreData}/>
     }
     </>

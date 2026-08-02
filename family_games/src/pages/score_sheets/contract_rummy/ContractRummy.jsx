@@ -9,7 +9,7 @@ let cols = ["2S", "1S1R", "2R", "3S", "2S1R", "2R1S", "3R"];
 // Keep the sheet ranked by total. One flag for both places it applies: the grid
 // re-ranks as rounds finish, and adding a player re-ranks here.
 const AUTO_SORT = true;
-function ContractRummy({players, scoreData, setScoreData}) {
+function ContractRummy({players, scoreData, setScoreData, onSubmitGame}) {
   // Built once per game so entered scores survive re-renders. A restored sheet
   // brings its own scores; a new game starts every player empty.
   const [scores, setScores] = useState(() => scoreData ??
@@ -17,6 +17,8 @@ function ContractRummy({players, scoreData, setScoreData}) {
   );
   const [addingPlayer, setAddingPlayer] = useState(false);
   const [numGroups, setNumGroups] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   // One group per player is as far as splitting them can go
   const maxGroups = Math.max(1, scores.size);
@@ -55,10 +57,28 @@ function ContractRummy({players, scoreData, setScoreData}) {
     replaceScores(AUTO_SORT ? sortedByTotal(next, cols) : next);
   };
 
+  // `scores` rather than the copy up in ScoreSheet, since cell edits mutate this
+  // one in place and it's the only one guaranteed current.
+  const submitGame = async () => {
+    setSubmitting(true);
+
+    try {
+      await onSubmitGame(scores);
+      setSubmitted(true);
+    } catch (err) {
+      // Alerted rather than shown in the footer: the button sits at the bottom
+      // of a long sheet, so a failure there is easy to submit over and miss.
+      // The button re-enables itself, so it's a retry rather than a dead end.
+      window.alert(`Could not submit the game.\n\n${err.message}`);
+    }
+
+    setSubmitting(false);
+  };
+
   return (
     <>
       <div>
-        <h1>Contract Rummy Coming Soon</h1>
+        <h1>Contract Rummy</h1>
       </div>
       {/* <SheetTable scoreData={scores} cols={cols} setScoreData={setScoreData}/> */}
       <AGGrid
@@ -83,9 +103,8 @@ function ContractRummy({players, scoreData, setScoreData}) {
             onChange={changeGroups}
           />
         </label>
-        {/* TODO: push the finished game to AWS (see README) */}
-        <button type="button">
-          Submit Game
+        <button type="button" onClick={submitGame} disabled={submitting || submitted}>
+          {submitting ? 'Submitting...' : submitted ? 'Submitted' : 'Submit Game'}
         </button>
       </div>
       {addingPlayer &&
