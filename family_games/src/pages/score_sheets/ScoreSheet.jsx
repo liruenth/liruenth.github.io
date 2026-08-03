@@ -3,28 +3,13 @@ import ContractRummy from './contract_rummy/ContractRummy';
 import MormonBridge from './mormon_bridge/MormonBridge';
 import StartNewGame from './common/StartNewGame';
 import { submitScores } from '../../api/routes';
+import { currentGameId, bumpGameId } from '../../helpers/gameId';
 
 function mapReplacer(key, value) {
   if (value instanceof Map) {
     return Object.fromEntries(value);
   }
   return value;
-}
-
-const GAME_ID_KEY = 'nextGameId';
-
-// Every row of a submitted game shares this id, so it doubles as the id of the
-// game itself. Kept in sessionStorage rather than a module variable so a refresh
-// mid-game doesn't reset it and file the next game under one already used.
-function currentGameId() {
-  const saved = Number(sessionStorage.getItem(GAME_ID_KEY));
-  return Number.isInteger(saved) && saved > 0 ? saved : 1;
-}
-
-// Counted on when the next game starts rather than when a submit lands, so a
-// failed attempt can be retried under the same id rather than burning one.
-function bumpGameId() {
-  sessionStorage.setItem(GAME_ID_KEY, String(currentGameId() + 1));
 }
 
 function ScoreSheet() {

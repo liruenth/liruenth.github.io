@@ -1,6 +1,7 @@
 /*
 Single source of truth for API endpoints, plus the calls that use them.
 */
+import { today } from '../helpers/gameId';
 
 export const API_BASE_URL = 'https://chiaq8el1b.execute-api.us-west-1.amazonaws.com';
 
@@ -14,15 +15,6 @@ export const routes = {
 // Joins a route path onto the base URL.
 export function apiUrl(path) {
   return `${API_BASE_URL}${path}`;
-}
-
-// Local date, not toISOString() — that reports UTC, which rolls the date over
-// early or late for anyone not on it.
-function today() {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${now.getFullYear()}-${month}-${day}`;
 }
 
 /* A sheet is a Map of player name to a Map of round to score, so one DynamoDB

@@ -6,7 +6,7 @@ import AddPlayerModal from '../common/AddPlayerModal'
 import ConfirmModal from '../common/ConfirmModal'
 import GroupsModal from '../common/GroupsModal'
 import SubmitGame from '../common/SubmitGame'
-import { lastCompleteCol, averageTotal, sortedByTotal } from '../common/scoring'
+import { lastCompleteCol, averageTotal, sortedByTotal } from '../../../helpers/scoring'
 
 let cols = ["2S", "1S1R", "2R", "3S", "2S1R", "2R1S", "3R"];
 

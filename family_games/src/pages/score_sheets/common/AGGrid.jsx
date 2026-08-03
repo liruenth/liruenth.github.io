@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { AllCommunityModule, themeBalham } from 'ag-grid-community';
 import { AgGridProvider, AgGridReact } from 'ag-grid-react';
-import { rowTotal, columnComplete, sortedByTotal } from './scoring';
+import { rowTotal, columnComplete, sortedByTotal } from '../../../helpers/scoring';
 import './AGGrid.css';
 
 // import 'ag-grid-community/styles/ag-grid.css';
