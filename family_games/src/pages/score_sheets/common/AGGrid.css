@@ -1,20 +1,19 @@
-/* Mirrors ROW_HEIGHT in AGGrid.jsx — the buttons under the sheet are sized to
-   match a table row, and the space reserved for them is derived from it. */
+/* Mirrors ROW_HEIGHT in AGGrid.jsx, and sizes the modal buttons to match a
+   table row. */
 :root {
   --sheet-row-height: 28px;
-  --sheet-footer-padding: 16px;
 }
 
 .grid-container {
-  /* Button row plus the padding above and below it */
-  --grid-footer-space: calc(
-    var(--sheet-row-height) + (2 * var(--sheet-footer-padding))
-  );
+  /* Nothing sits under the sheet any more — what was a footer of buttons is now
+     the actions menu pinned top-right — so this is breathing room rather than
+     space reserved for anything. */
+  --grid-bottom-space: 16px;
 
-  /* All the height we can take once the buttons have their space.
-     --grid-available is what's left below the grid's own top edge, measured in
-     AGGrid.jsx; the fallback covers the render before it's been measured. */
-  --grid-cap: calc(var(--grid-available, 100svh) - var(--grid-footer-space));
+  /* All the height we can take. --grid-available is what's left below the
+     grid's own top edge, measured in AGGrid.jsx; the fallback covers the render
+     before it's been measured. */
+  --grid-cap: calc(var(--grid-available, 100svh) - var(--grid-bottom-space));
 
   /* What's left for rows after the header and horizontal scrollbar, rounded
      down to whole rows. Without the rounding the leftover pixels render as a
@@ -79,73 +78,3 @@
   }
 }
 
-/* Fills the space .grid-container leaves free above. Three tracks rather than
-   space-between so the middle field is centred on the sheet itself — the two
-   buttons aren't the same width, so space-between would sit it off-centre. */
-.sheet-footer {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: var(--sheet-footer-padding) 0;
-  box-sizing: border-box;
-}
-
-.sheet-footer > :first-child {
-  justify-self: start;
-}
-
-.sheet-footer > :last-child {
-  justify-self: end;
-}
-
-.groups-field {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--text-h);
-  white-space: nowrap;
-}
-
-.groups-field input {
-  font: inherit;
-  font-size: 12px;
-  height: var(--sheet-row-height);
-  width: 4.5em;
-  padding: 0 6px;
-  text-align: center;
-  border-radius: 5px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text-h);
-  box-sizing: border-box;
-}
-
-.groups-field input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.sheet-footer button {
-  font: inherit;
-  font-size: 12px;
-  height: var(--sheet-row-height);
-  padding: 0 14px;
-  border-radius: 5px;
-  color: var(--accent);
-  background: var(--accent-bg);
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: border-color 0.3s;
-}
-
-.sheet-footer button:hover {
-  border-color: var(--accent-border);
-}
-
-.sheet-footer button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}

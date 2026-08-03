@@ -11,6 +11,22 @@ function mapReplacer(key, value) {
   return value;
 }
 
+const GAME_ID_KEY = 'nextGameId';
+
+// Every row of a submitted game shares this id, so it doubles as the id of the
+// game itself. Kept in sessionStorage rather than a module variable so a refresh
+// mid-game doesn't reset it and file the next game under one already used.
+function currentGameId() {
+  const saved = Number(sessionStorage.getItem(GAME_ID_KEY));
+  return Number.isInteger(saved) && saved > 0 ? saved : 1;
+}
+
+// Counted on when the next game starts rather than when a submit lands, so a
+// failed attempt can be retried under the same id rather than burning one.
+function bumpGameId() {
+  sessionStorage.setItem(GAME_ID_KEY, String(currentGameId() + 1));
+}
+
 function ScoreSheet() {
   const [scoreData, setScoreData] = useState(() => {
     let savedScoreData = sessionStorage.getItem('scoreData');
@@ -78,7 +94,23 @@ function ScoreSheet() {
   // Sends the finished game to DynamoDB. The sheet is passed in rather than read
   // from state: the game holds the live copy, and ours only catches up once a
   // cell edit pushes it back here. Errors are left to the caller to show.
-  const submitGame = (sheet) => submitScores(familyName, gameType, sheet ?? scoreData);
+  const submitGame = (sheet) =>
+    submitScores(familyName, gameType, sheet ?? scoreData, currentGameId());
+
+  // Back to choosing a game, with the family kept so the next sheet doesn't ask
+  // for it again. The effects above only write when their value is truthy, so
+  // they leave the old sheet in sessionStorage rather than clearing it — hence
+  // removing it here. Players aren't stored under a key of their own; they're
+  // read back off the sheet, so they're cleared with it.
+  const startNewGame = () => {
+    sessionStorage.removeItem('scoreData');
+    sessionStorage.removeItem('gameType');
+    bumpGameId();
+
+    setScoreData(null);
+    setGameType(null);
+    setPlayers([]);
+  };
 
    return (
 
@@ -107,7 +139,7 @@ function ScoreSheet() {
       : players.length === 0 ?
         <StartNewGame familyName={familyName} setFamilyName={setFamilyName} onConfirm={setPlayers}/>
       : gameType === "CR" ?
-        <ContractRummy players={players} scoreData={scoreData} setScoreData={setScoreData} onSubmitGame={submitGame}/>
+        <ContractRummy players={players} scoreData={scoreData} setScoreData={setScoreData} onSubmitGame={submitGame} onNewGame={startNewGame}/>
       : <MormonBridge players={players} setScoreData={setScoreData}/>
     }
     </>

@@ -1,0 +1,156 @@
+/* App chrome: a fixed hamburger button that slides a sidebar in from the left.
+   Everything is position: fixed so it sits outside the centered #root column. */
+
+.hamburger {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 44px;
+  height: 44px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.hamburger:hover {
+  border-color: var(--accent-border);
+}
+
+.hamburger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.hamburger-bar {
+  display: block;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--text-h);
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.3s,
+    visibility 0.3s;
+}
+
+.sidebar-backdrop.is-open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  max-width: 80vw;
+  height: 100svh;
+  box-sizing: border-box;
+  padding: 16px;
+  text-align: left;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition:
+    transform 0.3s ease,
+    visibility 0.3s;
+}
+
+.sidebar.is-open {
+  transform: translateX(0);
+  visibility: visible;
+  box-shadow: var(--shadow);
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-title {
+  font-family: var(--heading);
+  font-size: 18px;
+  color: var(--text-h);
+}
+
+.sidebar-close {
+  width: 32px;
+  height: 32px;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--text);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.sidebar-close:hover {
+  color: var(--text-h);
+  background: var(--social-bg);
+}
+
+.sidebar-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sidebar-links {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-links a {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 16px;
+  color: var(--text);
+  text-decoration: none;
+  transition:
+    background 0.3s,
+    color 0.3s;
+}
+
+.sidebar-links a:hover {
+  color: var(--text-h);
+  background: var(--social-bg);
+}
+
+.sidebar-links a.active {
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.sidebar-links a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

@@ -16,22 +16,6 @@ export function apiUrl(path) {
   return `${API_BASE_URL}${path}`;
 }
 
-const GAME_ID_KEY = 'nextGameId';
-
-// Every row of a submitted game shares this id, so it doubles as the id of the
-// game itself. Kept in sessionStorage rather than a module variable so a refresh
-// mid-game doesn't reset it and file the next game under one already used.
-export function currentGameId() {
-  const saved = Number(sessionStorage.getItem(GAME_ID_KEY));
-  return Number.isInteger(saved) && saved > 0 ? saved : 1;
-}
-
-// Bumped once the submit lands, so a failed attempt can be retried under the
-// same id rather than burning one.
-function bumpGameId() {
-  sessionStorage.setItem(GAME_ID_KEY, String(currentGameId() + 1));
-}
-
 // Local date, not toISOString() — that reports UTC, which rolls the date over
 // early or late for anyone not on it.
 function today() {
@@ -43,15 +27,15 @@ function today() {
 
 /* A sheet is a Map of player name to a Map of round to score, so one DynamoDB
    row per player per round they actually played. Rounds nobody reached are left
-   blank on the sheet and are skipped here rather than written as zeros. */
-export function buildScoreRows(familyName, gameType, scoreData) {
+   blank on the sheet and are skipped here rather than written as zeros.
+
+   Every row of a game carries the same gameId, so it doubles as the id of the
+   game itself — the caller owns it and is what counts it on. */
+export function buildScoreRows(familyName, gameType, scoreData, gameId) {
   if (!scoreData) {
     return [];
   }
 
-  // Read once, so every row of the game carries the same id even if a submit
-  // lands in between
-  const id = currentGameId();
   const date = today();
   const rows = [];
 
@@ -64,7 +48,7 @@ export function buildScoreRows(familyName, gameType, scoreData) {
       }
 
       rows.push({
-        id,
+        id: gameId,
         date,
         player_name: player,
         family_name: familyName,
@@ -79,8 +63,8 @@ export function buildScoreRows(familyName, gameType, scoreData) {
 }
 
 // Sends a finished game to the Lambda that writes it to DynamoDB.
-export async function submitScores(familyName, gameType, scoreData) {
-  const rows = buildScoreRows(familyName, gameType, scoreData);
+export async function submitScores(familyName, gameType, scoreData, gameId) {
+  const rows = buildScoreRows(familyName, gameType, scoreData, gameId);
   if (rows.length === 0) {
     throw new Error('No scores to submit');
   }
@@ -99,6 +83,5 @@ export async function submitScores(familyName, gameType, scoreData) {
     throw new Error(reason || `Submit failed with ${res.status}`);
   }
 
-  bumpGameId();
   return rows;
 }

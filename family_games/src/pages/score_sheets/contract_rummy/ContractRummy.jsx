@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react'
 import SheetTable from '../common/FrozenTable'
 import AGGrid from '../common/AGGrid'
+import ActionsMenu from '../common/ActionsMenu'
 import AddPlayerModal from '../common/AddPlayerModal'
+import ConfirmModal from '../common/ConfirmModal'
+import GroupsModal from '../common/GroupsModal'
+import SubmitGame from '../common/SubmitGame'
 import { lastCompleteCol, averageTotal, sortedByTotal } from '../common/scoring'
 
 let cols = ["2S", "1S1R", "2R", "3S", "2S1R", "2R1S", "3R"];
@@ -9,26 +13,19 @@ let cols = ["2S", "1S1R", "2R", "3S", "2S1R", "2R1S", "3R"];
 // Keep the sheet ranked by total. One flag for both places it applies: the grid
 // re-ranks as rounds finish, and adding a player re-ranks here.
 const AUTO_SORT = true;
-function ContractRummy({players, scoreData, setScoreData, onSubmitGame}) {
+function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGame}) {
   // Built once per game so entered scores survive re-renders. A restored sheet
   // brings its own scores; a new game starts every player empty.
   const [scores, setScores] = useState(() => scoreData ??
     new Map(players.map(player => [player, new Map()]))
   );
   const [addingPlayer, setAddingPlayer] = useState(false);
+  const [changingGroups, setChangingGroups] = useState(false);
+  const [startingNewGame, setStartingNewGame] = useState(false);
   const [numGroups, setNumGroups] = useState(1);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
 
   // One group per player is as far as splitting them can go
   const maxGroups = Math.max(1, scores.size);
-
-  const changeGroups = (event) => {
-    // Clamped here as well as on the input, since typing into a number field can
-    // put values outside min/max — and clearing it reads back as an empty string.
-    const value = Math.floor(Number(event.target.value));
-    setNumGroups(Number.isFinite(value) && value >= 1 ? Math.min(value, maxGroups) : 1);
-  };
 
   // Swapping the Map for a new one is what lets the grid see a change to the
   // roster or to the row order — cell edits mutate it in place instead. Held here
@@ -57,26 +54,41 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame}) {
     replaceScores(AUTO_SORT ? sortedByTotal(next, cols) : next);
   };
 
-  // `scores` rather than the copy up in ScoreSheet, since cell edits mutate this
-  // one in place and it's the only one guaranteed current.
-  const submitGame = async () => {
-    setSubmitting(true);
-
-    try {
-      await onSubmitGame(scores);
-      setSubmitted(true);
-    } catch (err) {
-      // Alerted rather than shown in the footer: the button sits at the bottom
-      // of a long sheet, so a failure there is easy to submit over and miss.
-      // The button re-enables itself, so it's a retry rather than a dead end.
-      window.alert(`Could not submit the game.\n\n${err.message}`);
-    }
-
-    setSubmitting(false);
-  };
-
   return (
     <>
+      {/* Children get the closer so picking an item dismisses the menu. Submit
+          is passed the live `scores` rather than the copy up in ScoreSheet,
+          since cell edits mutate this one in place and it's the only one
+          guaranteed current. */}
+      <ActionsMenu>
+        {(closeMenu) => (
+          <>
+            <button
+              type="button"
+              className="actions-menu-item"
+              onClick={() => { setAddingPlayer(true); closeMenu(); }}
+            >
+              Add Player
+            </button>
+            <button
+              type="button"
+              className="actions-menu-item"
+              onClick={() => { setChangingGroups(true); closeMenu(); }}
+            >
+              Groups ({numGroups})
+            </button>
+            <SubmitGame scores={scores} onSubmit={onSubmitGame} onSelect={closeMenu}/>
+            <button
+              type="button"
+              className="actions-menu-item is-destructive"
+              onClick={() => { setStartingNewGame(true); closeMenu(); }}
+            >
+              New Game
+            </button>
+          </>
+        )}
+      </ActionsMenu>
+
       <div>
         <h1>Contract Rummy</h1>
       </div>
@@ -88,30 +100,28 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame}) {
         autoSortTable={AUTO_SORT}
         onReorder={replaceScores}
       />
-      <div className="sheet-footer">
-        <button type="button" onClick={() => setAddingPlayer(true)}>
-          Add Player
-        </button>
-        <label className="groups-field">
-          Groups
-          <input
-            type="number"
-            min="1"
-            max={maxGroups}
-            step="1"
-            value={numGroups}
-            onChange={changeGroups}
-          />
-        </label>
-        <button type="button" onClick={submitGame} disabled={submitting || submitted}>
-          {submitting ? 'Submitting...' : submitted ? 'Submitted' : 'Submit Game'}
-        </button>
-      </div>
       {addingPlayer &&
         <AddPlayerModal
           existingPlayers={[...scores.keys()]}
           onAdd={addPlayer}
           onClose={() => setAddingPlayer(false)}
+        />
+      }
+      {changingGroups &&
+        <GroupsModal
+          value={numGroups}
+          maxGroups={maxGroups}
+          onSave={setNumGroups}
+          onClose={() => setChangingGroups(false)}
+        />
+      }
+      {startingNewGame &&
+        <ConfirmModal
+          heading="Start New Game"
+          message="Do you want to start a new game?"
+          confirmLabel="Start New Game"
+          onConfirm={onNewGame}
+          onClose={() => setStartingNewGame(false)}
         />
       }
     </>

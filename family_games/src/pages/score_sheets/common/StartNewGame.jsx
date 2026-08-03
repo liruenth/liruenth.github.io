@@ -5,7 +5,7 @@
 - Allow users to select, deselect, and add new players
 - On confirmation return the selected players as an array
 */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './StartNewGame.css'
 
 // TODO: point at the real AWS endpoint once it exists (see README)
@@ -22,15 +22,38 @@ async function fetchFamilyPlayers(familyName) {
   return res.json();
 }
 
+// Both ways in — the form below and the mount effect — go through here, so the
+// fallback applies to either. Returns rather than sets, since the two callers
+// are in a different position to say what should happen while it's in flight.
+async function loadFamilyRoster(familyName) {
+  try {
+    return { roster: await fetchFamilyPlayers(familyName), usingStub: false };
+  } catch {
+    // The stub URL never resolves, so fall back to a local roster.
+    return { roster: STUB_PLAYERS, usingStub: true };
+  }
+}
+
 function StartNewGame({ familyName, setFamilyName, onConfirm }) {
   const [familyInput, setFamilyInput] = useState('');
   const [players, setPlayers] = useState([]);
   const [selected, setSelected] = useState([]);
   const [newPlayer, setNewPlayer] = useState('');
-  const [loading, setLoading] = useState(false);
+  // Arriving with a family already set means the effect below is about to
+  // fetch, so open in the loading state rather than flashing an empty roster.
+  const [loading, setLoading] = useState(() => !!familyName);
   const [error, setError] = useState(null);
   const [usingStub, setUsingStub] = useState(false);
 
+  const applyRoster = ({ roster, usingStub: fellBack }) => {
+    setPlayers(roster);
+    setUsingStub(fellBack);
+    setSelected([]);
+    setLoading(false);
+  };
+
+  // The family is set last so the form keeps showing its loading state rather
+  // than handing over to a roster that hasn't arrived.
   const loadPlayers = async (e) => {
     e.preventDefault();
     const name = familyInput.trim();
@@ -40,21 +63,34 @@ function StartNewGame({ familyName, setFamilyName, onConfirm }) {
 
     setLoading(true);
     setError(null);
-    setUsingStub(false);
+    applyRoster(await loadFamilyRoster(name));
+    setFamilyName(name);
+  };
 
-    try {
-      const roster = await fetchFamilyPlayers(name);
-      setPlayers(roster);
-    } catch {
-      // The stub URL never resolves, so fall back to a local roster.
-      setPlayers(STUB_PLAYERS);
-      setUsingStub(true);
+  // Mounting with a family already set — a refresh part-way through setup, or a
+  // new game carrying the family over — skips the form that would have fetched
+  // the roster, so fetch it here instead. Without this the list renders empty
+  // with no way to fill it but adding everyone by hand.
+  //
+  // Mount only. The obvious dependency is the roster being empty, but that's
+  // also what a family with no players back from the API looks like, which
+  // would leave it refetching forever. Listing familyName instead would refetch
+  // the roster the form has just fetched, the moment it sets the family.
+  useEffect(() => {
+    if (!familyName) {
+      return;
     }
 
-    setFamilyName(name);
-    setSelected([]);
-    setLoading(false);
-  };
+    let cancelled = false;
+    loadFamilyRoster(familyName).then((result) => {
+      if (!cancelled) {
+        applyRoster(result);
+      }
+    });
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const togglePlayer = (player) => {
     setSelected((prev) =>
@@ -91,6 +127,9 @@ function StartNewGame({ familyName, setFamilyName, onConfirm }) {
     setNewPlayer('');
     setError(null);
     setUsingStub(false);
+    // The roster can still be on its way in — changing family before it lands
+    // would otherwise leave the form's button stuck on "Loading Players...".
+    setLoading(false);
   };
 
   if (!familyName) {
@@ -128,6 +167,7 @@ function StartNewGame({ familyName, setFamilyName, onConfirm }) {
         </p>
       </div>
 
+      {loading && <p className="notice">Loading players...</p>}
       {usingStub && <p className="notice">Roster unavailable — showing stub players.</p>}
       {error && <p className="notice">{error}</p>}
 

@@ -1,0 +1,21 @@
+/* The dialog shell only. The buttons inside it use .modal-actions, which
+   AddPlayerModal.css already defines unprefixed as a shared modal class. */
+
+.confirm-modal {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  min-width: 280px;
+  text-align: left;
+}
+
+.confirm-modal::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.confirm-modal h2 {
+  margin-top: 0;
+}

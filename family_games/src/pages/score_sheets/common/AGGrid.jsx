@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { AllCommunityModule, themeBalham, themeAlpine, themeQuartz } from 'ag-grid-community';
+import { AllCommunityModule, themeBalham } from 'ag-grid-community';
 import { AgGridProvider, AgGridReact } from 'ag-grid-react';
 import { rowTotal, columnComplete, sortedByTotal } from './scoring';
 import './AGGrid.css';
@@ -93,10 +93,6 @@ const AGGrid = ({scoreData, cols, setScoreData, autoSortTable, onReorder}) => {
     return background ? { background } : undefined;
   }, []);
 
-  // { field: 'make2', editable: true },
-  // { field: 'model', editable: true },
-  // { field: 'price', editable: true }
-  //
   // flex: 0 opts the pinned columns out of the width sharing, and their own
   // minWidth overrides the floor in defaultColDef, which would otherwise hold
   // them open to the round columns' minimum.
@@ -106,15 +102,23 @@ const AGGrid = ({scoreData, cols, setScoreData, autoSortTable, onReorder}) => {
 
     return [
       { field: 'player', pinned: 'left', flex: 0, width: playerWidth, minWidth: playerWidth },
-      ...cols.map((col) => ({ field: col, editable: true })),
+      // The editor renders an <input type="number">, which is what gets a phone
+      // to raise its number pad instead of the full keyboard. cellDataType keeps
+      // the column numeric on the way back out too, so a score is stored as a
+      // number rather than the string a text editor would hand back. Scores are
+      // whole, so no decimals — and the stepper buttons stay off by default,
+      // which suits a column this narrow.
+      ...cols.map((col) => ({
+        field: col,
+        editable: true,
+        cellDataType: 'number',
+        cellEditor: 'agNumberCellEditor',
+        cellEditorParams: { precision: 0 }
+      })),
       { field: 'total', pinned: 'right', flex: 0, width: totalWidth, minWidth: totalWidth }
     ];
   }, [cols, smallScreen]);
 
-  // { make2: "Toyota", model: "Celica", price: 35000 },
-  // { make2: "Ford", model: "Mondeo", price: 32000 },
-  // { make2: "Porsche", model: "Boxster", },
-  //
   // Keyed on the Map's identity, which changes when the roster or the row order
   // does — so adding a player or re-ranking rebuilds the rows, while cell edits
   // (which mutate in place) leave them untouched.
@@ -220,8 +224,6 @@ const AGGrid = ({scoreData, cols, setScoreData, autoSortTable, onReorder}) => {
       <AgGridProvider modules={modules}>
         <AgGridReact
           theme={gridTheme}
-          // theme={themeAlpine}
-          // theme={themeQuartz}
           defaultColDef={defaultColDef}
           columnDefs={columnDefs}
           rowData={rowData}
@@ -230,6 +232,7 @@ const AGGrid = ({scoreData, cols, setScoreData, autoSortTable, onReorder}) => {
           headerHeight={HEADER_HEIGHT}
           getRowStyle={getRowStyle}
           onCellValueChanged={onCellValueChanged}
+          singleClickEdit={smallScreen}
           onFirstDataRendered={measureLayout}
           onGridSizeChanged={measureLayout}
           lockPinned={true}
