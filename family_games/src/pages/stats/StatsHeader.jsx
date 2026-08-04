@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import './StatsHeader.css'
 import { GAME_TYPES } from '../../helpers/gameTypes'
 import { SORT_OPTIONS, titleCase } from '../../helpers/statsData'
@@ -10,6 +11,36 @@ function StatsHeader({
   familyName, players, filters, setFilters, sort, setSort,
   view, setView, shown, total, onChangeFamily, onReset,
 }) {
+  /* A disclosure opens and shuts on its summary and nothing else, so dismissing
+     the roster by clicking past it is wired up here — same as the sheet's actions
+     menu, and for the same reason: a panel over the page that only closes from the
+     control that opened it is one the reader has to go back and put away. Held in
+     state rather than left on the element, so the two can't disagree about it. */
+  const [playersOpen, setPlayersOpen] = useState(false);
+  const playerFilter = useRef(null);
+
+  useEffect(() => {
+    if (!playersOpen) return;
+
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setPlayersOpen(false);
+    };
+
+    // mousedown rather than click, matching ActionsMenu: a checkbox re-rendered
+    // out from under the click would leave it landing on nothing, reading as
+    // outside and shutting the list mid-selection.
+    const closeOnOutsideClick = (event) => {
+      if (!playerFilter.current.contains(event.target)) setPlayersOpen(false);
+    };
+
+    window.addEventListener('keydown', closeOnEscape);
+    window.addEventListener('mousedown', closeOnOutsideClick);
+    return () => {
+      window.removeEventListener('keydown', closeOnEscape);
+      window.removeEventListener('mousedown', closeOnOutsideClick);
+    };
+  }, [playersOpen]);
+
   const update = (key) => (e) =>
     setFilters((prev) => ({ ...prev, [key]: e.target.value }));
 
@@ -59,7 +90,14 @@ function StatsHeader({
       <div className="stats-filters">
         {/* Closed by default — a family of a dozen would otherwise be the whole
             header. The count on the summary is what's picked while it's shut. */}
-        <details className="stats-filter stats-player-filter">
+        <details
+          ref={playerFilter}
+          className="stats-filter stats-player-filter"
+          open={playersOpen}
+          // Fires whichever way it was opened, so a click on the summary is what
+          // keeps the state above in step with the element.
+          onToggle={(e) => setPlayersOpen(e.currentTarget.open)}
+        >
           <summary>
             Players{filters.players.length > 0 && ` (${filters.players.length})`}
           </summary>
