@@ -6,21 +6,14 @@
 - On confirmation return the selected players as an array
 */
 import { useState, useEffect } from 'react'
+import { fetchFamilyPlayers } from '../../../api/routes'
 import './StartNewGame.css'
 
-// TODO: point at the real AWS endpoint once it exists (see README)
-const PLAYERS_URL = 'https://stub.family-games.invalid/api/families';
-
-// Used when the stub endpoint is unreachable so the flow stays usable pre-backend.
+// Used when the roster can't be read, so the flow stays usable. Not used for a
+// family that just hasn't played yet: an empty list is a roster the Add Player
+// form below can fill, and inventing a dozen names for a real family is worse
+// than handing back none.
 const STUB_PLAYERS = ["Jim", "Joe", "Jay", "Sal", "Gpa", "Gma", "Mike", "Cry", "Rex", "Johnny", "Cami", "Emily"];
-
-async function fetchFamilyPlayers(familyName) {
-  const res = await fetch(`${PLAYERS_URL}/${encodeURIComponent(familyName)}/players`);
-  if (!res.ok) {
-    throw new Error(`Request failed with ${res.status}`);
-  }
-  return res.json();
-}
 
 // Both ways in — the form below and the mount effect — go through here, so the
 // fallback applies to either. Returns rather than sets, since the two callers
@@ -29,7 +22,6 @@ async function loadFamilyRoster(familyName) {
   try {
     return { roster: await fetchFamilyPlayers(familyName), usingStub: false };
   } catch {
-    // The stub URL never resolves, so fall back to a local roster.
     return { roster: STUB_PLAYERS, usingStub: true };
   }
 }

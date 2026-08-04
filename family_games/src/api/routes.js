@@ -8,8 +8,10 @@ export const API_BASE_URL = 'https://chiaq8el1b.execute-api.us-west-1.amazonaws.
 
 // Path builders — relative to API_BASE_URL, no leading base included.
 export const routes = {
+  // Every player of the family, whatever they played — so no type, unlike the
+  // reads below. The handler answers 400 without the family.
   familyPlayers: (familyName) =>
-    `/families/${encodeURIComponent(familyName)}/players`,
+    `/players?${new URLSearchParams({ family: familyName })}`,
   scores: () => '/games',
   // Same path as scores() — the handler dispatches on the method, so the history
   // is a GET of the collection the games are POSTed to. Both params are required
@@ -88,6 +90,19 @@ export async function submitScores(familyName, gameType, scoreData, gameId) {
   }
 
   return rows;
+}
+
+/* The family's roster, as an array of names: everyone a game has been scored for
+   under that family name. Uppercase, because that's how the writer stores them —
+   the same reason a lookup doesn't have to match how a name was typed. */
+export async function fetchFamilyPlayers(familyName) {
+  const res = await fetch(apiUrl(routes.familyPlayers(familyName)));
+
+  if (!res.ok) {
+    throw new Error(await failureReason(res, 'Loading players'));
+  }
+
+  return res.json();
 }
 
 /* A family's finished games of one type, as the handler groups them: an object
