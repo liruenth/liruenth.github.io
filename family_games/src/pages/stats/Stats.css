@@ -1,0 +1,51 @@
+/*
+Depends on StartNewGame.css for `.notice`, `.link-button`, `.player-list` and
+`.player` — generic enough to be shared, and already in the bundle since App.jsx
+imports the score sheet outright. The text input recipe is repeated below rather
+than borrowed, since `.start-new-game` names a flow this page isn't part of.
+*/
+
+/* The page is a list, not a centred panel: `#center` places its content in the
+   middle of the viewport, which pushes a stack of tables off the bottom. */
+.stats {
+  place-content: start;
+  padding-bottom: 48px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.stats-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.stats-form input[type='text'] {
+  font: inherit;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.stats-form input[type='text']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.game-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Between the games rather than around them, so the first table doesn't open on a
+   rule with nothing above it and the last doesn't close on one. */
+.game-block + .game-block {
+  border-top: 1px solid var(--border);
+  margin-top: 32px;
+  padding-top: 32px;
+}

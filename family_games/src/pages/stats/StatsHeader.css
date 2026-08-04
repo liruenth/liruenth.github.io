@@ -1,0 +1,134 @@
+/*
+The filter bar. Selects and date inputs are styled to the same recipe as the text
+inputs elsewhere in the app — there was no `<select>` in the codebase before this,
+so left alone they'd be the one control that ignores the theme in dark mode.
+*/
+
+.stats-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.stats-views {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.stats-view {
+  font: inherit;
+  font-size: 16px;
+  padding: 6px 18px;
+  border: none;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.stats-view + .stats-view {
+  border-left: 1px solid var(--border);
+}
+
+.stats-view:hover {
+  color: var(--text-h);
+}
+
+.stats-view.is-active {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.stats-view:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.stats-filters {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  font-size: 16px;
+}
+
+.stats-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stats-filters select,
+.stats-filters input[type='date'] {
+  font: inherit;
+  font-size: 16px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.stats-filters select:focus-visible,
+.stats-filters input[type='date']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.stats-filters .link-button:disabled {
+  color: var(--text);
+  text-decoration: none;
+  cursor: default;
+}
+
+/* The disclosure's summary is dressed as the controls beside it, so the row reads
+   as one set rather than a marker wedged between two inputs. */
+.stats-player-filter > summary {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.stats-player-filter > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Out of the flow, or opening it would shove the rest of the row along. Anchored
+   to the header rather than the summary so a long roster stays centred, and the
+   filters below it aren't reflowed by a list that's only briefly there. */
+.stats-player-filter {
+  position: relative;
+}
+
+.stats-player-filter > .player-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  width: max-content;
+  max-width: min(90vw, 600px);
+  max-height: 50vh;
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+}
+
+@media (max-width: 1024px) {
+  .stats-filters {
+    gap: 10px 12px;
+  }
+}

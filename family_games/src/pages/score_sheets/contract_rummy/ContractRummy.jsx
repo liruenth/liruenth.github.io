@@ -7,8 +7,9 @@ import ConfirmModal from '../common/ConfirmModal'
 import GroupsModal from '../common/GroupsModal'
 import SubmitGame from '../common/SubmitGame'
 import { lastCompleteCol, averageTotal, sortedByTotal } from '../../../helpers/scoring'
+import { roundsFor } from '../../../helpers/gameTypes'
 
-let cols = ["2S", "1S1R", "2R", "3S", "2S1R", "2R1S", "3R"];
+const cols = roundsFor('CR');
 
 // Keep the sheet ranked by total. One flag for both places it applies: the grid
 // re-ranks as rounds finish, and adding a player re-ranks here.

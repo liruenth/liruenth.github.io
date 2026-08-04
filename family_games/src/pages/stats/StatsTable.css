@@ -1,0 +1,95 @@
+/*
+The read-only tables both stats views are made of: a game's sheet and the player
+totals. Tokens only — common/Table.css hardcodes its greys and so only works in
+light mode.
+*/
+
+/* A width of its own, because the totals table is a direct child of the centred
+   column while the game tables sit in a full-width list. Left to size to its
+   content it would grow past the page instead of scrolling inside it, since the
+   scroller below can only bound itself against a parent that's bounded. */
+.game-block {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.game-block h2 {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.game-type {
+  font-size: 15px;
+  font-weight: 400;
+  padding: 2px 8px;
+  border-radius: 6px;
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+
+/* Seven rounds plus a total is wider than a phone, so the table scrolls inside
+   its own box rather than taking the page sideways with it. */
+.stats-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.stats-table {
+  border-collapse: collapse;
+  /* Centred while it fits, filling the scroller once it doesn't */
+  margin: 0 auto;
+  min-width: 100%;
+  font-size: 16px;
+}
+
+/* Stated on every cell rather than left to the table, so nothing further up can
+   decide what a score sits on — the sticky column below is held over these, and
+   a cell it can see through is a cell it smears. */
+.stats-table th,
+.stats-table td {
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--text-h);
+  background: var(--bg);
+  font-weight: 400;
+}
+
+/* --code-bg, not --social-bg: the latter is half-transparent, which a heading
+   row that stays put while the table scrolls under it cannot be. */
+.stats-table thead th {
+  font-weight: 500;
+  background: var(--code-bg);
+}
+
+/* Whose row it is stays put while the rounds scroll past */
+.stats-table .stats-table-name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  text-align: left;
+}
+
+.stats-table thead .stats-table-name {
+  z-index: 2;
+}
+
+.stats-table .stats-table-total {
+  font-weight: 500;
+}
+
+/* Won it — whichever end of the totals its game counts from. The tint is a
+   background *image* so it layers over the opaque colour above rather than
+   replacing it: --accent-bg is half-transparent, and the first cell of the row
+   is the sticky one the table scrolls under. */
+.stats-table .is-winner th,
+.stats-table .is-winner td {
+  color: var(--accent);
+  background-image: linear-gradient(var(--accent-bg), var(--accent-bg));
+}

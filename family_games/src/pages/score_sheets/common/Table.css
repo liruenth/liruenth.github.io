@@ -1,3 +1,8 @@
+/* Everything here is scoped to the container, because bare `table` and `th, td`
+   rules reach every table in the app — and this sheet is imported whether or not
+   the component is rendered, so its white cell background was landing on the
+   stats page and leaving those scores near-white on white in dark mode. */
+
 /* Container handles the outer scroll bounds */
 .table-container {
   max-height: 400px;
@@ -6,13 +11,14 @@
   border: 1px solid #ccc;
 }
 
-table {
+.table-container table {
   border-collapse: separate; /* Required for sticky borders to render properly */
   border-spacing: 0;
   width: 100%;
 }
 
-th, td {
+.table-container th,
+.table-container td {
   padding: 12px;
   border-bottom: 1px solid #ddd;
   border-right: 1px solid #ddd;

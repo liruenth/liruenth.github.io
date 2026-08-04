@@ -8,7 +8,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css'
 import Sidebar from './Sidebar'
 import ScoreSheet from './pages/score_sheets/ScoreSheet'
-import Stats from './pages/Stats'
+import Stats from './pages/stats/Stats'
 
 function App() {
   const [menuOpen, setMenuOpen] = useState(false)

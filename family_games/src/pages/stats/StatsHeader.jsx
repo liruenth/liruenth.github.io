@@ -1,0 +1,137 @@
+import './StatsHeader.css'
+import { GAME_TYPES } from '../../helpers/gameTypes'
+import { SORT_OPTIONS, titleCase } from '../../helpers/statsData'
+
+/* Everything that decides which games are shown and in what order. The controls
+   are native — a disclosure for the player checkboxes, selects for the single
+   choices — so keyboard, screen readers and the phone's own pickers come for free
+   rather than being rebuilt. */
+function StatsHeader({
+  familyName, players, filters, setFilters, sort, setSort,
+  view, setView, shown, total, onChangeFamily, onReset,
+}) {
+  const update = (key) => (e) =>
+    setFilters((prev) => ({ ...prev, [key]: e.target.value }));
+
+  const togglePlayer = (player) => {
+    setFilters((prev) => ({
+      ...prev,
+      players: prev.players.includes(player)
+        ? prev.players.filter((p) => p !== player)
+        : [...prev.players, player],
+    }));
+  };
+
+  const filtered = filters.players.length > 0 ||
+    !!filters.dateFrom || !!filters.dateTo || !!filters.type;
+
+  return (
+    <div className="stats-header">
+      <div>
+        <h1>Stats</h1>
+        <p>
+          {titleCase(familyName)} family
+          <button type="button" className="link-button" onClick={onChangeFamily}>
+            change
+          </button>
+        </p>
+      </div>
+
+      <div className="stats-views" role="group" aria-label="View">
+        <button
+          type="button"
+          className={view === 'games' ? 'stats-view is-active' : 'stats-view'}
+          aria-pressed={view === 'games'}
+          onClick={() => setView('games')}
+        >
+          Games
+        </button>
+        <button
+          type="button"
+          className={view === 'players' ? 'stats-view is-active' : 'stats-view'}
+          aria-pressed={view === 'players'}
+          onClick={() => setView('players')}
+        >
+          Players
+        </button>
+      </div>
+
+      <div className="stats-filters">
+        {/* Closed by default — a family of a dozen would otherwise be the whole
+            header. The count on the summary is what's picked while it's shut. */}
+        <details className="stats-filter stats-player-filter">
+          <summary>
+            Players{filters.players.length > 0 && ` (${filters.players.length})`}
+          </summary>
+          <ul className="player-list">
+            {players.map((player) => {
+              const selected = filters.players.includes(player);
+              return (
+                <li key={player}>
+                  <label className={selected ? 'player selected' : 'player'}>
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => togglePlayer(player)}
+                    />
+                    {titleCase(player)}
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+
+        <label className="stats-filter">
+          From
+          <input type="date" value={filters.dateFrom} onChange={update('dateFrom')} />
+        </label>
+
+        <label className="stats-filter">
+          To
+          <input type="date" value={filters.dateTo} onChange={update('dateTo')} />
+        </label>
+
+        <label className="stats-filter">
+          Game
+          <select value={filters.type} onChange={update('type')}>
+            <option value="">All games</option>
+            {GAME_TYPES.map((type) => (
+              <option key={type.id} value={type.id}>{type.label}</option>
+            ))}
+          </select>
+        </label>
+
+        {/* Ordering the stack of games says nothing about a table of players,
+            which is ranked by wins on its own. */}
+        {view === 'games' && (
+          <label className="stats-filter">
+            Order
+            <select value={sort} onChange={(e) => setSort(e.target.value)}>
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        <button
+          type="button"
+          className="link-button"
+          disabled={!filtered}
+          onClick={onReset}
+        >
+          reset
+        </button>
+      </div>
+
+      {/* "3 of 12" only once a filter is hiding something — an unfiltered count
+          of itself reads as though something were being held back. */}
+      <p className="notice">
+        {shown === total ? `${total} games` : `${shown} of ${total} games`}
+      </p>
+    </div>
+  );
+}
+
+export default StatsHeader
