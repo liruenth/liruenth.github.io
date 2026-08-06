@@ -1,11 +1,28 @@
+/*
+The grid every sheet is drawn on.
+
+What's here is everything that doesn't depend on what a round is: the theme, the
+two frozen columns, the responsive widths, and the height math that keeps the
+grid inside the viewport with its header row frozen. What a round column looks
+like and what happens when one is edited belong to the game, so they live with
+it — see contract_rummy/contract_rummy_table.jsx and
+mormon_bridge/mormon_bridge_table.jsx, which both render this.
+
+The constants and helpers those two share with it are in sheetGrid.js, so this
+file exports a component and nothing else.
+*/
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { AllCommunityModule, themeBalham } from 'ag-grid-community';
 import { AgGridProvider, AgGridReact } from 'ag-grid-react';
-import { rowTotal, columnComplete, sortedByTotal } from '../../../helpers/scoring';
+import {
+  ROW_HEIGHT,
+  HEADER_HEIGHT,
+  MIN_COL_WIDTH,
+  MIN_COL_WIDTH_SMALL,
+  getRowStyle,
+  useSmallScreen
+} from './sheetGrid';
 import './AGGrid.css';
-
-// import 'ag-grid-community/styles/ag-grid.css';
-// import 'ag-grid-community/styles/ag-theme-alpine.css';
 
 const modules = [AllCommunityModule];
 
@@ -13,68 +30,18 @@ const modules = [AllCommunityModule];
 // as well. Built once — a new theme object on each render re-inits the grid.
 const gridTheme = themeBalham.withParams({ columnBorder: true });
 
-// Set explicitly rather than left to the theme so the height math below can
-// know what the grid will actually render.
-const ROW_HEIGHT = 28;
-const HEADER_HEIGHT = 32;
-
-// A 100px floor reads well on a desktop, but on a phone the two pinned columns
-// alone would take most of the screen and leave the rounds no room, so the floor
-// drops on small screens. Kept in step with the breakpoint in AGGrid.css —
-// minWidth is a column value, so it can't come from the media query itself.
-const MIN_COL_WIDTH = 100;
-const MIN_COL_WIDTH_SMALL = 48;
-const SMALL_SCREEN = '(max-width: 1024px)';
-
-// The pinned columns hold a name and a running total — fixed content that
-// doesn't get wider with the screen. They're sized to it and kept out of the
-// flex share, so the spare width goes to the round columns instead of padding
-// these two out.
-const PLAYER_COL_WIDTH = 200;
-const PLAYER_COL_WIDTH_SMALL = 64;
-const TOTAL_COL_WIDTH = 100;
-const TOTAL_COL_WIDTH_SMALL = 64;
-
-// A grid-driven change ('data') would loop back through rowData, so only
-// write on edits the user made themselves. Our own total write uses its own
-// source so the recalc it triggers gets filtered out here too.
-const MANUAL_SOURCES = ['edit', 'paste', 'undo', 'redo'];
-const TOTAL_SOURCE = 'rowTotal';
-
-
-// Background for a data row, chosen from its running total. The bands are still
-// to be decided, so every path returns null for now and rows keep the theme's
-// own background.
-function rowBackground(total) {
-  if (!Number.isFinite(total)) {
-    return null;
-  }
-
-  // TODO: pick the colours — e.g. leader vs middle of the pack vs trailing
-  return null;
-}
-
-function buildRows(scoreData, cols) {
-  // A restored sheet already holds scores, so spread them onto the row
-  return [...scoreData.keys()].map((player) => ({
-    player,
-    ...Object.fromEntries(scoreData.get(player)),
-    total: rowTotal(scoreData.get(player), cols)
-  }));
-}
-
-const AGGrid = ({scoreData, cols, setScoreData, autoSortTable, onReorder}) => {
+const SheetGrid = ({
+  columnDefs,
+  rowData,
+  rowHeight = ROW_HEIGHT,
+  headerHeight = HEADER_HEIGHT,
+  defaultColDef: colDefOverrides,
+  ...gridProps
+}) => {
   const containerRef = useRef(null);
   const [layout, setLayout] = useState({ scrollbar: 0, available: null });
 
-  const [smallScreen, setSmallScreen] = useState(() => window.matchMedia(SMALL_SCREEN).matches);
-
-  useEffect(() => {
-    const query = window.matchMedia(SMALL_SCREEN);
-    const update = (event) => setSmallScreen(event.matches);
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
+  const smallScreen = useSmallScreen();
 
   const defaultColDef = useMemo(() => {
     return {
@@ -82,82 +49,10 @@ const AGGrid = ({scoreData, cols, setScoreData, autoSortTable, onReorder}) => {
       // Share out the spare width evenly, but never shrink below the floor.
       // Under that total the grid scrolls horizontally instead.
       flex: 1,
-      minWidth: smallScreen ? MIN_COL_WIDTH_SMALL : MIN_COL_WIDTH
+      minWidth: smallScreen ? MIN_COL_WIDTH_SMALL : MIN_COL_WIDTH,
+      ...colDefOverrides
     };
-  }, [smallScreen]);
-
-  // Rows are styled by their total, which getRowStyle only reads when a row is
-  // drawn — see the redraw in onCellValueChanged.
-  const getRowStyle = useCallback((params) => {
-    const background = rowBackground(params.data?.total);
-    return background ? { background } : undefined;
-  }, []);
-
-  // flex: 0 opts the pinned columns out of the width sharing, and their own
-  // minWidth overrides the floor in defaultColDef, which would otherwise hold
-  // them open to the round columns' minimum.
-  const columnDefs = useMemo(() => {
-    const playerWidth = smallScreen ? PLAYER_COL_WIDTH_SMALL : PLAYER_COL_WIDTH;
-    const totalWidth = smallScreen ? TOTAL_COL_WIDTH_SMALL : TOTAL_COL_WIDTH;
-
-    return [
-      { field: 'player', pinned: 'left', flex: 0, width: playerWidth, minWidth: playerWidth },
-      // The editor renders an <input type="number">, which is what gets a phone
-      // to raise its number pad instead of the full keyboard. cellDataType keeps
-      // the column numeric on the way back out too, so a score is stored as a
-      // number rather than the string a text editor would hand back. Scores are
-      // whole, so no decimals — and the stepper buttons stay off by default,
-      // which suits a column this narrow.
-      ...cols.map((col) => ({
-        field: col,
-        editable: true,
-        cellDataType: 'number',
-        cellEditor: 'agNumberCellEditor',
-        cellEditorParams: { precision: 0 }
-      })),
-      { field: 'total', pinned: 'right', flex: 0, width: totalWidth, minWidth: totalWidth }
-    ];
-  }, [cols, smallScreen]);
-
-  // Keyed on the Map's identity, which changes when the roster or the row order
-  // does — so adding a player or re-ranking rebuilds the rows, while cell edits
-  // (which mutate in place) leave them untouched.
-  const rowData = useMemo(() => buildRows(scoreData, cols), [scoreData, cols]);
-
-  // Lets AG Grid move existing rows on a re-sort instead of rebuilding them all
-  const getRowId = useCallback((params) => params.data.player, []);
-
-  const onCellValueChanged = useCallback((event) => {
-    if (!MANUAL_SOURCES.includes(event.source)) {
-      return;
-    }
-
-    const player = event.data.player;
-    const col = event.colDef.field;
-    const playerScores = scoreData.get(player);
-    if (!playerScores) {
-      return;
-    }
-
-    playerScores.set(col, event.newValue);
-    // Totals stay derived — recomputed from the row rather than stored
-    event.node.setDataValue('total', rowTotal(playerScores, cols), TOTAL_SOURCE);
-    // Setting a value repaints the cell but not the row, so the background has
-    // to be asked for again now the total it depends on has moved.
-    event.api.redrawRows({ rowNodes: [event.node] });
-
-    // Re-rank once the edit leaves no blanks in the column — the cell that
-    // completes a round needn't be the bottom one. Handing the reordered sheet up
-    // rather than sorting the grid means the order is part of the saved data, so
-    // it survives a refresh, and it stays a one-off: rows settle and then hold
-    // still through the next column instead of re-shuffling on every edit.
-    if (autoSortTable && onReorder && columnComplete(scoreData, col)) {
-      onReorder(sortedByTotal(scoreData, cols));
-      return;
-    }
-
-    setScoreData(new Map(scoreData));
-  }, [scoreData, cols, setScoreData, autoSortTable, onReorder]);
+  }, [smallScreen, colDefOverrides]);
 
   const measureLayout = useCallback(() => {
     const container = containerRef.current;
@@ -198,13 +93,17 @@ const AGGrid = ({scoreData, cols, setScoreData, autoSortTable, onReorder}) => {
   // Everything in the grid's height that isn't rows, which the CSS needs so it
   // can round the leftover space down to whole rows. +2 covers the container's
   // top and bottom border.
-  const chromeHeight = HEADER_HEIGHT + layout.scrollbar + 2;
+  const chromeHeight = headerHeight + layout.scrollbar + 2;
 
   // What the grid would take to show every row without scrolling. The CSS caps
   // this against the space left below the grid.
-  const naturalHeight = chromeHeight + (rowData.length * ROW_HEIGHT);
+  const naturalHeight = chromeHeight + (rowData.length * rowHeight);
 
   const sizing = {
+    // The CSS rounds the leftover space down to whole rows, so it has to be told
+    // how tall a row is on this sheet rather than assume the default. Mormon
+    // Bridge's cell CSS positions its text against it too.
+    '--sheet-row-height': `${rowHeight}px`,
     '--grid-natural-height': `${naturalHeight}px`,
     '--grid-chrome': `${chromeHeight}px`
   };
@@ -215,7 +114,6 @@ const AGGrid = ({scoreData, cols, setScoreData, autoSortTable, onReorder}) => {
   }
 
   return (
-    // <div className="ag-theme-alpine" style={{ height: 300, width: 600 }}><
     <div
       ref={containerRef}
       className="grid-container"
@@ -227,19 +125,18 @@ const AGGrid = ({scoreData, cols, setScoreData, autoSortTable, onReorder}) => {
           defaultColDef={defaultColDef}
           columnDefs={columnDefs}
           rowData={rowData}
-          getRowId={getRowId}
-          rowHeight={ROW_HEIGHT}
-          headerHeight={HEADER_HEIGHT}
+          rowHeight={rowHeight}
+          headerHeight={headerHeight}
           getRowStyle={getRowStyle}
-          onCellValueChanged={onCellValueChanged}
           singleClickEdit={smallScreen}
           onFirstDataRendered={measureLayout}
           onGridSizeChanged={measureLayout}
           lockPinned={true}
+          {...gridProps}
         />
       </AgGridProvider>
     </div>
   );
 }
 
-export default AGGrid
+export default SheetGrid

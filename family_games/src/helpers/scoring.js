@@ -50,12 +50,16 @@ export function averageTotal(scoreData, cols) {
   return Math.round(sum / scoreData.size);
 }
 
-// The sheet's own key order is the row order, so ranking players means rebuilding
-// the Map in the new order. Inner Maps are carried over by reference, so no score
-// is copied or lost.
-export function sortedByTotal(scoreData, cols) {
+/* The sheet's own key order is the row order, so ranking players means rebuilding
+   the Map in the new order. Inner Maps are carried over by reference, so no score
+   is copied or lost.
+
+   `total` is how this game adds a row up, since not every one of them sums its
+   cells — Mormon Bridge's hold a bid and a took as well as the score. Defaulted
+   to the plain sum, which is what the sheet that does sum its cells passes. */
+export function sortedByTotal(scoreData, cols, total = rowTotal) {
   const ranked = [...scoreData.keys()].sort((a, b) => (
-    rowTotal(scoreData.get(a), cols) - rowTotal(scoreData.get(b), cols)
+    total(scoreData.get(a), cols) - total(scoreData.get(b), cols)
   ));
 
   return new Map(ranked.map((player) => [player, scoreData.get(player)]));

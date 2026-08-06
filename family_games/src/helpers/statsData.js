@@ -13,7 +13,8 @@ every string is uppercased, and the fields are renamed (`player`, not
 `player_name`). The renaming is why the rows are read by their stored names below.
 */
 import { rowTotal, sortedByTotal } from './scoring';
-import { roundsFor, winsWith } from './gameTypes';
+import { mbRowTotal } from './mormonBridge';
+import { roundsFor, winsWith, roundCellFor, rowOrderFor } from './gameTypes';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -34,21 +35,45 @@ export function formatDate(date) {
   return name && year && day ? `${name} ${Number(day)}, ${year}` : String(date ?? '');
 }
 
+// A number the row didn't carry reads back blank, not zero — a round nobody bid
+// in isn't a round somebody bid nothing in.
+function storedNumber(value) {
+  return value === undefined || value === null || value === '' || !Number.isFinite(Number(value))
+    ? ''
+    : Number(value);
+}
+
 /* A game's rows into the sheet that was played, plus what the stats page sorts
    and filters on. Every round of the type gets a column, played or not, so games
    stacked one under another line up rather than each being its own width — a game
    that ended early is blank in the rounds it never reached, exactly as its sheet
    looked. Rounds the type doesn't list are appended, so data written before a
-   round list changed still renders in full. */
+   round list changed still renders in full.
+
+   A cell is whatever that type's round holds — a score, or the bid and took with
+   the score worked out from them — so a rebuilt game is the same shape the sheet
+   works in either way, and totalled the way that sheet totals it. */
 function buildGame(gameId, type, rows) {
+  const bidTook = roundCellFor(type) === 'bid-took';
+  const total = bidTook ? mbRowTotal : rowTotal;
+
   const scores = new Map();
+  const seats = new Map();
   const seenRounds = [];
 
   for (const row of rows) {
     if (!scores.has(row.player)) {
       scores.set(row.player, new Map());
     }
-    scores.get(row.player).set(row.round, Number(row.score));
+    scores.get(row.player).set(row.round, bidTook
+      ? { bid: storedNumber(row.bid), took: storedNumber(row.took), score: Number(row.score) }
+      : Number(row.score));
+
+    // Every row of a player's carries the same seat, so the first one to name it
+    // has named it. A row written before seats were stored doesn't.
+    if (!seats.has(row.player) && storedNumber(row.seat) !== '') {
+      seats.set(row.player, Number(row.seat));
+    }
 
     if (!seenRounds.includes(row.round)) {
       seenRounds.push(row.round);
@@ -59,7 +84,7 @@ function buildGame(gameId, type, rows) {
   const rounds = [...known, ...seenRounds.filter((round) => !known.includes(round))];
 
   const totals = new Map(
-    [...scores].map(([player, playerScores]) => [player, rowTotal(playerScores, rounds)])
+    [...scores].map(([player, playerScores]) => [player, total(playerScores, rounds)])
   );
   const scoreList = [...totals.values()];
   const lowestTotal = scoreList.length ? Math.min(...scoreList) : null;
@@ -70,10 +95,23 @@ function buildGame(gameId, type, rows) {
      leaving the winner the top row of either. Everyone level with the winning
      total won it: a tie is a tie, not whichever of them the sort put first. */
   const high = winsWith(type) === 'high';
-  const ascending = [...sortedByTotal(scores, rounds).keys()];
-  const ranked = high ? ascending.reverse() : ascending;
+  const ascending = [...sortedByTotal(scores, rounds, total).keys()];
+  const ranked = high ? [...ascending].reverse() : ascending;
   const winningTotal = high ? highestTotal : lowestTotal;
   const winners = ranked.filter((player) => totals.get(player) === winningTotal);
+
+  /* The order the game was actually played in, where the rows say. Mormon Bridge
+     is played round the table and its rows are the seating, so a finished game
+     read back ranked isn't the sheet that was played — the bidding no longer goes
+     down the page. Falls back to the order the rows arrived in if any player is
+     missing a seat, which is a game written before seats were stored: a partly
+     seated order would be neither one thing nor the other. */
+  const players = [...scores.keys()];
+  const seated = seats.size === players.length
+    ? [...players].sort((a, b) => seats.get(a) - seats.get(b))
+    : players;
+
+  const order = rowOrderFor(type) === 'seat' ? seated : ranked;
 
   /* The id is unique per day, and a day's games are told apart by the counter the
      id ends in — which is the number the game was known by while it was on. An id
@@ -87,11 +125,13 @@ function buildGame(gameId, type, rows) {
     gameNumber: counter === -1 ? null : gameId.slice(counter + 1),
     date: rows[0]?.date ?? (counter === -1 ? gameId : gameId.slice(0, counter)),
     type,
-    players: [...scores.keys()],
+    players,
     rounds,
     scores,
     totals,
     ranked,
+    // What the game's table puts its rows in, which isn't always the ranking
+    order,
     winners,
     playerCount: scores.size,
     lowestTotal,

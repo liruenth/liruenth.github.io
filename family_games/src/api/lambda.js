@@ -32,6 +32,19 @@ function upper(value) {
   return typeof value === "string" ? value.toUpperCase() : value;
 }
 
+// Fields a row doesn't always carry: Mormon Bridge sends what was bid and what
+// was taken alongside the score it worked out from them, Contract Rummy has
+// neither, and rows written before either existed have no seat. Absent rather
+// than null where there's nothing to store, so nothing reading the item has to
+// tell an empty attribute from a missing one.
+const OPTIONAL_NUMBERS = ["bid", "took", "seat"];
+
+function optionalNumber(value) {
+  const number = Number(value);
+  const present = value !== undefined && value !== null && value !== "";
+  return present && Number.isFinite(number) ? number : undefined;
+}
+
 // One submitted row becomes one DynamoDB item. The composite keys are built
 // here rather than at query time so the GSIs have something to sort on.
 function buildItem(row) {
@@ -41,7 +54,7 @@ function buildItem(row) {
   const family = upper(row.family_name);
   const type = upper(row.type);
 
-  return {
+  const item = {
     id: `${date}_${row.id}`,
     date,
     date_round: `${date}#${round}`,
@@ -55,6 +68,17 @@ function buildItem(row) {
     score: Number(row.score),
     type
   };
+
+  // Numbers, and for the same reason score is: two are counts of tricks and one
+  // is a row index, and what's done with all three is arithmetic.
+  for (const field of OPTIONAL_NUMBERS) {
+    const value = optionalNumber(row[field]);
+    if (value !== undefined) {
+      item[field] = value;
+    }
+  }
+
+  return item;
 }
 
 // Named so the caller gets told which row was wrong, rather than a blanket 400
@@ -67,6 +91,16 @@ function rowError(row, index) {
 
   if (!Number.isFinite(Number(row.score))) {
     return `Row ${index} has a non-numeric score`;
+  }
+
+  // Optional — a Contract Rummy row has no bid or took — but a row that sent one
+  // and got it wrong is a bug worth naming rather than an attribute quietly
+  // dropped on the floor.
+  for (const field of OPTIONAL_NUMBERS) {
+    const value = row[field];
+    if (value !== undefined && value !== null && value !== "" && !Number.isFinite(Number(value))) {
+      return `Row ${index} has a non-numeric ${field}`;
+    }
   }
 
   return null;

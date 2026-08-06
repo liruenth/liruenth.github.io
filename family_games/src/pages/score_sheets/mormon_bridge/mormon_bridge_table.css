@@ -1,0 +1,40 @@
+/*
+What the three-triangle round cell needs from the grid it's sitting in. The cell
+itself — the wedges, their geometry and their colours — is round_cell.css, which
+the stats page uses as well.
+*/
+
+/* AG Grid pads its cells for text, and padding would stop the wedges reaching the
+   cell's edges. The custom property is how the theme applies it; the shorthand
+   covers anything set outside the theme. */
+.grid-container .ag-cell.mb-round-cell,
+.grid-container .ag-header-cell.mb-round-header {
+  --ag-cell-horizontal-padding: 0px;
+  padding: 0;
+}
+
+/* A custom header component is wrapped before it's placed, and the wrapper is
+   what has to fill the header cell for the wedges to have a box to divide. */
+.grid-container .ag-header-cell.mb-round-header .ag-header-cell-comp-wrapper {
+  width: 100%;
+  height: 100%;
+}
+
+/* A removed player. Their rounds stay on the sheet and still submit — the row is
+   out of play, not gone — so the whole row takes the shade a closed cell already
+   has, rather than being faded into one of its own.
+
+   Which means the score wedge gives its fill up here: laid over a row that's
+   already that colour it would come out darker than the rest, and the one part of
+   the row that can't be typed into would be the one part that looked live. */
+.grid-container .mb-row-disabled .ag-cell {
+  background: var(--mb-closed-fill, rgba(0, 0, 0, 0.07));
+}
+
+.grid-container .mb-row-disabled .mb-wedge-score {
+  background: transparent;
+}
+
+.grid-container .mb-row-disabled input.mb-wedge {
+  cursor: not-allowed;
+}

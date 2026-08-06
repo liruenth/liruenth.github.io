@@ -45,6 +45,11 @@ light mode.
   margin: 0 auto;
   min-width: 100%;
   font-size: 16px;
+
+  /* Only the three-triangle round cell below uses it, but a table cell won't hand
+     a percentage height down to what's inside it, so the number has to come from
+     somewhere both the cell and its contents can see. */
+  --stats-round-height: 46px;
 }
 
 /* Stated on every cell rather than left to the table, so nothing further up can
@@ -92,4 +97,34 @@ light mode.
 .stats-table .is-winner td {
   color: var(--accent);
   background-image: linear-gradient(var(--accent-bg), var(--accent-bg));
+}
+
+/* A Mormon Bridge round: the bid and took in the top corners and the score across
+   the bottom, drawn as the same three triangles the sheet draws (round_cell.css).
+   The wedges have to reach the cell's edges, so the padding every other cell gets
+   comes off here.
+
+   The fill and text are re-stated from the page's own tokens rather than left on
+   the defaults: those are fixed light, because on the sheet they sit inside AG
+   Grid's Balham theme, which stays light whatever the page around it is doing.
+   This table isn't in it, so here they follow the theme. */
+.stats-table .stats-round-cell {
+  --mb-closed-fill: color-mix(in srgb, var(--text-h) 9%, transparent);
+  --mb-closed-text: var(--text-h);
+
+  padding: 0;
+  min-width: 76px;
+  height: var(--stats-round-height);
+}
+
+.stats-table .stats-round-cell .mb-round {
+  height: var(--stats-round-height);
+  font-size: 15px;
+}
+
+/* The score wedge names its own colour, so it has to be told about the win too —
+   otherwise the one number that matters is the one that stays black while the
+   rest of the row goes accent. */
+.stats-table .is-winner .stats-round-cell {
+  --mb-closed-text: var(--accent);
 }

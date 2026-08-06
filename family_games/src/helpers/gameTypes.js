@@ -10,6 +10,12 @@ columns in the order they were played rather than the order the API returns them
 
 `wins` is which end of the totals took it, and the games disagree — so it lives
 here with the game rather than being assumed wherever a winner gets worked out.
+
+`roundCell` is what one round of one player holds: a score on its own, or a bid
+and a took with the score worked out from them. `rowOrder` is the order a
+finished game's rows are read back in — ranked, or the order they were played in.
+Both are the same kind of fact as `wins`: something the games disagree about that
+several places downstream have to agree on.
 */
 
 export const GAME_TYPES = [
@@ -18,14 +24,23 @@ export const GAME_TYPES = [
     label: 'Contract Rummy',
     rounds: ['2S', '1S1R', '2R', '3S', '2S1R', '2R1S', '3R'],
     wins: 'low',
+    roundCell: 'score',
+    rowOrder: 'rank',
   },
   {
-    // Nothing scores an MB game yet, so no rows of it can exist. Listed anyway
-    // so it's one entry to fill in rather than a type the stats page can't name.
     id: 'MB',
     label: 'Mormon Bridge',
-    rounds: [],
+    // Counts down, ten cards dealt to one. The round is also how many tricks are
+    // on the table, which is what the bonus for taking the lot is checked
+    // against — see helpers/mormonBridge.js.
+    rounds: ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
     wins: 'high',
+    roundCell: 'bid-took',
+    // Who deals and who bids first moves round the table, so the rows are the
+    // seating — which is why they're picked in that order to start with, and why
+    // a finished game is read back in it rather than ranked.
+    rowOrder: 'seat',
+    setupNotice: 'Add players in turn order starting with the first to bid',
   },
 ];
 
@@ -49,4 +64,23 @@ export function roundsFor(id) {
 // only sheet there is, so it's the safer thing to guess for a type off this list.
 export function winsWith(id) {
   return gameType(id)?.wins ?? 'low';
+}
+
+// Anything the roster screen has to say about how this game wants its players
+// entered, or null where it doesn't care. Kept here with the game's other facts
+// so that screen stays one screen rather than one per type.
+export function setupNoticeFor(id) {
+  return gameType(id)?.setupNotice ?? null;
+}
+
+// A bare score, for a type that hasn't said — it's the simpler of the two, and
+// it's what every row written before there was a second kind holds.
+export function roundCellFor(id) {
+  return gameType(id)?.roundCell ?? 'score';
+}
+
+// Ranked, for a type that hasn't said: a game with nothing to say about the order
+// it was played in is one there's no reason to show in anything but its result.
+export function rowOrderFor(id) {
+  return gameType(id)?.rowOrder ?? 'rank';
 }

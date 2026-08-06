@@ -70,3 +70,17 @@
   font-size: 15px;
   color: var(--accent);
 }
+
+/* An instruction rather than a status line: the others below it report what the
+   screen is doing, this one changes what you're meant to do on it — pick the
+   players in the order they'll play. Added alongside .notice rather than folded
+   into it, which the stats page also uses for its own status lines. */
+.notice.is-important {
+  font-weight: 600;
+  padding: 8px 14px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 6px 6px 0;
+  background: var(--accent-bg);
+  text-align: left;
+  max-width: 600px;
+}

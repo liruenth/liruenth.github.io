@@ -35,9 +35,28 @@ async function failureReason(res, fallback) {
   return reason || `${fallback} failed with ${res.status}`;
 }
 
-/* A sheet is a Map of player name to a Map of round to score, so one DynamoDB
-   row per player per round they actually played. Rounds nobody reached are left
-   blank on the sheet and are skipped here rather than written as zeros.
+/* Editors hand back strings, and an empty one is an unplayed round. */
+function enteredNumber(value) {
+  const number = Number(value);
+  const entered = value !== '' && value !== null && value !== undefined;
+  return entered && Number.isFinite(number) ? number : null;
+}
+
+/* A sheet is a Map of player name to a Map of round to what was played in it, so
+   one DynamoDB row per player per round they actually played. Rounds nobody
+   reached are left blank on the sheet and are skipped here rather than written as
+   zeros.
+
+   What a round holds is the games' one disagreement. Contract Rummy's is the
+   score itself; Mormon Bridge's is what was bid and taken with the score worked
+   out from the pair, so it's an object and all three go on the row. Either way
+   the row is the same shape bar its optional fields, which is what lets the
+   history come back as one kind of thing.
+
+   `seat` is which row the player was on. It goes on every row because nothing
+   else carries it — the history comes back ordered by round, not by who sat
+   where — and a Mormon Bridge sheet read back in any other order isn't the sheet
+   that was played: the rows are the seating, and the bidding went round them.
 
    Every row of a game carries the same gameId, so it doubles as the id of the
    game itself — the caller owns it and is what counts it on. */
@@ -48,24 +67,44 @@ export function buildScoreRows(familyName, gameType, scoreData, gameId) {
 
   const date = today();
   const rows = [];
+  let seat = 0;
 
   for (const [player, playerScores] of scoreData) {
-    for (const [round, rawScore] of playerScores) {
-      const score = Number(rawScore);
-      // Editors hand back strings, and an empty one is an unplayed round
-      if (rawScore === '' || rawScore === null || !Number.isFinite(score)) {
+    // Counted over the sheet's rows, not over the rows written: a player who
+    // never got a score is still a seat everyone after them sat one along from.
+    const playerSeat = seat;
+    seat += 1;
+
+    for (const [round, played] of playerScores) {
+      const cell = played && typeof played === 'object' ? played : { score: played };
+      const score = enteredNumber(cell.score);
+      if (score === null) {
         continue;
       }
 
-      rows.push({
+      const row = {
         id: gameId,
         date,
         player_name: player,
         family_name: familyName,
         round,
         score,
+        seat: playerSeat,
         type: gameType,
-      });
+      };
+
+      // Left off the row entirely for a game that doesn't have them, rather than
+      // sent as nulls the writer would have to strip back out again.
+      const bid = enteredNumber(cell.bid);
+      const took = enteredNumber(cell.took);
+      if (bid !== null) {
+        row.bid = bid;
+      }
+      if (took !== null) {
+        row.took = took;
+      }
+
+      rows.push(row);
     }
   }
 

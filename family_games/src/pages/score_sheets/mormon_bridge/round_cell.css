@@ -1,0 +1,173 @@
+/*
+The three-triangle round cell, shared by the sheet and the stats page.
+
+Each wedge is laid over the whole cell and then cut down to its own triangle with
+clip-path, which is what makes them tile the cell exactly with no seams to line
+up. clip-path clips pointer events as well as paint, so on the sheet a click only
+ever lands on the wedge it looks like it hit — the triangles are the tap targets.
+
+  ┌───────┬───────┐   score's base is the cell's whole bottom edge and its apex
+  │ 2   ╱   ╲   3 │   is the top centre, so it takes half the cell; bid and took
+  │   ╱       ╲   │   take a quarter each off the top corners.
+  │ ╱     17    ╲ │
+  └───────────────┘
+
+The colours default to the light ones the sheet needs: the grid renders in AG
+Grid's Balham theme, which is light whatever the page around it is doing, so a
+fill mixed from the page's own text colour would come out white-on-white there in
+dark mode. The stats table, which does follow the page, overrides them — see
+StatsTable.css.
+*/
+
+/* On :root rather than on .mb-round, because the sheet's removed-player row takes
+   the same fill and that's set on the row, which is the cell's parent. */
+:root {
+  --mb-closed-fill: rgba(0, 0, 0, 0.07);
+  --mb-closed-text: rgba(0, 0, 0, 0.75);
+}
+
+.mb-round {
+  position: relative;
+  flex: 1;
+  align-self: stretch;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.mb-wedge {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+}
+
+.mb-wedge-bid {
+  clip-path: polygon(0 0, 50% 0, 0 100%);
+}
+
+.mb-wedge-took {
+  clip-path: polygon(50% 0, 100% 0, 100% 100%);
+}
+
+.mb-wedge-score {
+  clip-path: polygon(0 100%, 100% 100%, 50% 0);
+  /* Also what draws the two diagonals: the cell has no borders inside it, so the
+     score's fill is the only thing that shows where the wedges divide. */
+  background: var(--mb-closed-fill);
+}
+
+/* An input centres its text in its content box, so padding is the only way to
+   move it — half a row at the bottom lifts the text into the top half of the
+   cell, which is the wide end of the bid and took wedges. Percentage padding
+   resolves against width, so the fraction of a row has to be written as one:
+   --sheet-row-height comes from the grid, see AGGrid.jsx. */
+input.mb-wedge {
+  padding-block: 0 calc(var(--sheet-row-height) / 2);
+  /* No steppers: there's no room for them, and the wedge isn't a rectangle for
+     them to sit in the corner of. */
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input.mb-wedge::-webkit-outer-spin-button,
+input.mb-wedge::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input.mb-wedge-bid {
+  text-align: left;
+  padding-inline: 5px 0;
+}
+
+input.mb-wedge-took {
+  text-align: right;
+  padding-inline: 0 5px;
+}
+
+/* The other way round from the two above: half a row at the top drops the score
+   into the bottom half, where its own wedge is widest. */
+input.mb-wedge-score {
+  text-align: center;
+  padding-block: calc(var(--sheet-row-height) / 2) 0;
+}
+
+/* Disabled so it can't be typed into, but it's the number the players are
+   actually reading, so undo the fading a disabled input comes with and let the
+   fill behind it be what says the cell is closed. */
+input.mb-wedge-score:disabled {
+  opacity: 1;
+  color: var(--mb-closed-text);
+  -webkit-text-fill-color: var(--mb-closed-text);
+  cursor: default;
+}
+
+/* The tinted triangle is the focus ring — an outline would be drawn round the
+   input's rectangle and then clipped to nothing along two of its edges. */
+input.mb-wedge:focus {
+  outline: none;
+  background: rgba(38, 112, 216, 0.16);
+}
+
+/* Text rather than an input — the stats page's cells, and both tables' headings.
+   Placed rather than padded into position: each wedge is a flex box aligned into
+   its own widest corner, which needs no row height to work from. */
+span.mb-wedge {
+  display: flex;
+  line-height: 1;
+}
+
+span.mb-wedge-bid {
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 4px 0 0 4px;
+}
+
+span.mb-wedge-took {
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 4px 4px 0 0;
+}
+
+span.mb-wedge-score {
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 0 4px;
+  color: var(--mb-closed-text);
+}
+
+/* A heading says which side is which rather than carrying a value, so the labels
+   get out of the way of the round number they sit over. */
+.mb-round-heading span.mb-wedge-bid,
+.mb-round-heading span.mb-wedge-took {
+  font-size: 0.7em;
+  opacity: 0.75;
+}
+
+.mb-round-heading span.mb-wedge-score {
+  font-weight: 600;
+}
+
+/* Two digits have to fit in the top corner of a column that can get down to
+   48px wide, so give the wedges their edges back. */
+@media (max-width: 1024px) {
+  input.mb-wedge-bid,
+  span.mb-wedge-bid {
+    padding-inline: 2px 0;
+  }
+
+  input.mb-wedge-took,
+  span.mb-wedge-took {
+    padding-inline: 0 2px;
+  }
+
+  .mb-round-heading span.mb-wedge-bid,
+  .mb-round-heading span.mb-wedge-took {
+    font-size: 0.6em;
+  }
+}

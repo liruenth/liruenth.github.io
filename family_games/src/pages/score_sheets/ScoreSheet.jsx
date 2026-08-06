@@ -5,28 +5,42 @@ import StartNewGame from './common/StartNewGame';
 import { submitScores } from '../../api/routes';
 import { currentGameId, bumpGameId } from '../../helpers/gameId';
 
+/* A sheet is Maps inside Maps, which JSON has no notion of, so each one is
+   written out marked as what it is and read back by that mark.
+
+   Marked rather than guessed at: a Mormon Bridge round is an object of its own —
+   a bid, a took and a score — and a reviver that turned every object it met into
+   a Map would swallow it along with the two it's meant to catch. */
+const MAP_MARK = '__map';
+
 function mapReplacer(key, value) {
-  if (value instanceof Map) {
-    return Object.fromEntries(value);
+  return value instanceof Map ? { [MAP_MARK]: [...value] } : value;
+}
+
+function mapReviver(key, value) {
+  return value && Array.isArray(value[MAP_MARK]) ? new Map(value[MAP_MARK]) : value;
+}
+
+/* A sheet saved before the marks above were written is unreadable now. There's
+   nothing to migrate — it's a game in progress in one tab, not history — so it's
+   dropped and that tab starts over rather than restoring something the sheet
+   can't use. */
+function restoreScoreData() {
+  const saved = sessionStorage.getItem('scoreData');
+  if (!saved) {
+    return null;
   }
-  return value;
+
+  try {
+    const parsed = JSON.parse(saved, mapReviver);
+    return parsed instanceof Map ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 function ScoreSheet() {
-  const [scoreData, setScoreData] = useState(() => {
-    let savedScoreData = sessionStorage.getItem('scoreData');
-    if (!!savedScoreData) {
-      const parsedFromObj = JSON.parse(savedScoreData, (key, value) => {
-        if (value && typeof value === 'object' && !Array.isArray(value)) {
-          return new Map(Object.entries(value));
-        }
-        return value;
-      });
-      return parsedFromObj;
-    }
-
-    return null
-  });
+  const [scoreData, setScoreData] = useState(restoreScoreData);
   const [familyName, setFamilyName] = useState(() => {
     let savedFamilyName = sessionStorage.getItem('familyName');
     if (!!savedFamilyName) {
@@ -122,10 +136,10 @@ function ScoreSheet() {
           </button>
         </section>
       : players.length === 0 ?
-        <StartNewGame familyName={familyName} setFamilyName={setFamilyName} onConfirm={setPlayers}/>
+        <StartNewGame gameType={gameType} familyName={familyName} setFamilyName={setFamilyName} onConfirm={setPlayers}/>
       : gameType === "CR" ?
         <ContractRummy players={players} scoreData={scoreData} setScoreData={setScoreData} onSubmitGame={submitGame} onNewGame={startNewGame}/>
-      : <MormonBridge players={players} setScoreData={setScoreData}/>
+      : <MormonBridge players={players} scoreData={scoreData} setScoreData={setScoreData} onSubmitGame={submitGame} onNewGame={startNewGame}/>
     }
     </>
   )

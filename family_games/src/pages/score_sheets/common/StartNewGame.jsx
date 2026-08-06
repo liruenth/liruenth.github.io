@@ -7,6 +7,7 @@
 */
 import { useState, useEffect } from 'react'
 import { fetchFamilyPlayers } from '../../../api/routes'
+import { setupNoticeFor } from '../../../helpers/gameTypes'
 import './StartNewGame.css'
 
 // Used when the roster can't be read, so the flow stays usable. Not used for a
@@ -26,7 +27,13 @@ async function loadFamilyRoster(familyName) {
   }
 }
 
-function StartNewGame({ familyName, setFamilyName, onConfirm }) {
+function StartNewGame({ gameType, familyName, setFamilyName, onConfirm }) {
+  // Whatever this game wants said about how its players are entered — Mormon
+  // Bridge is played round the table, so the order they're picked in is the
+  // order they'll bid in. Asked of the game rather than branched on here, so
+  // this screen stays one screen however many games there end up being.
+  const setupNotice = setupNoticeFor(gameType);
+
   const [familyInput, setFamilyInput] = useState('');
   const [players, setPlayers] = useState([]);
   const [selected, setSelected] = useState([]);
@@ -159,6 +166,7 @@ function StartNewGame({ familyName, setFamilyName, onConfirm }) {
         </p>
       </div>
 
+      {setupNotice && <p className="notice is-important">{setupNotice}</p>}
       {loading && <p className="notice">Loading players...</p>}
       {usingStub && <p className="notice">Roster unavailable — showing stub players.</p>}
       {error && <p className="notice">{error}</p>}

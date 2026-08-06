@@ -1,0 +1,45 @@
+/* The dialog shell, same as the other two sheet modals. The list inside reuses
+   .player-list and .player from StartNewGame.css — it's the same roster of the
+   same names, so it reads the same way — and .modal-actions from
+   AddPlayerModal.css, which defines it unprefixed as a shared modal class. */
+
+.remove-player-modal {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  min-width: 280px;
+  max-width: min(440px, 90vw);
+}
+
+.remove-player-modal::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.remove-player-modal h2 {
+  margin-top: 0;
+}
+
+.remove-player-modal form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.modal-hint {
+  margin: 0;
+  font-size: 15px;
+  opacity: 0.8;
+}
+
+/* Ticked means out, which is the opposite of what a tick means on the roster
+   screen this list is borrowed from — so it can't reuse .selected's accent. Faded
+   and struck through instead: the same way the sheet draws the row it produces. */
+.remove-player-modal .player.removed {
+  opacity: 0.55;
+  text-decoration: line-through;
+  border-color: var(--border);
+}

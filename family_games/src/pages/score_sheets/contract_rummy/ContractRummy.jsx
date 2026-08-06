@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react'
-import SheetTable from '../common/FrozenTable'
-import AGGrid from '../common/AGGrid'
+import { useState } from 'react'
+import ContractRummyTable from './contract_rummy_table'
 import ActionsMenu from '../common/ActionsMenu'
 import AddPlayerModal from '../common/AddPlayerModal'
 import ConfirmModal from '../common/ConfirmModal'
@@ -93,8 +92,7 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGam
       <div>
         <h1>Contract Rummy</h1>
       </div>
-      {/* <SheetTable scoreData={scores} cols={cols} setScoreData={setScoreData}/> */}
-      <AGGrid
+      <ContractRummyTable
         scoreData={scores}
         cols={cols}
         setScoreData={setScoreData}

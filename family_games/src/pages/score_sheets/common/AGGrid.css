@@ -1,5 +1,9 @@
 /* Mirrors ROW_HEIGHT in AGGrid.jsx, and sizes the modal buttons to match a
-   table row. */
+   table row. Sheets whose rows are taller — a Mormon Bridge cell holds a bid, a
+   took and a score — override it on .grid-container from their rowHeight, which
+   is where the rounding below reads it. Left on :root as well as set there, so
+   the modals keep a row height to size to: they're portalled out of the grid, so
+   an override inside it can't reach them. */
 :root {
   --sheet-row-height: 28px;
 }
