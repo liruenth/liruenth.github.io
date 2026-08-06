@@ -1,0 +1,68 @@
+/* The dialog shell, same as the other sheet modals. The roster in the first phase
+   reuses .player-list and .player from StartNewGame.css — it's the same list of
+   the same names — and .modal-actions and .modal-hint come from AddPlayerModal.css
+   and RemovePlayerModal.css, which define them unprefixed as shared modal classes. */
+
+.auto-step-modal {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  min-width: 300px;
+  max-width: min(440px, 90vw);
+}
+
+.auto-step-modal::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.auto-step-modal h2 {
+  margin-top: 0;
+}
+
+.auto-step-modal form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+/* How many tricks are still to be called for, and how many players have yet to
+   call. Goes negative on an overbid round, which is worth reading as a warning
+   rather than as a number that has gone wrong. */
+.auto-step-tally {
+  margin: 0;
+  font-size: 15px;
+  color: var(--accent);
+}
+
+/* Big, because it's the one thing being aimed at between one Enter and the next,
+   and often on a phone. Steppers off: there's a keypad for that, and they'd take
+   the width the number wants. */
+.auto-step-input {
+  font: inherit;
+  font-size: 32px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+  box-sizing: border-box;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.auto-step-input::-webkit-outer-spin-button,
+.auto-step-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.auto-step-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

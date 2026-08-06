@@ -28,7 +28,7 @@ import {
   TOTAL_SOURCE
 } from '../common/sheetGrid';
 import RoundWedges from './RoundWedges';
-import { mbRowTotal, roundScore, emptyCell } from '../../../helpers/mormonBridge';
+import { mbRowTotal, setCellValue, clampToRound } from '../../../helpers/mormonBridge';
 import './round_cell.css';
 import './mormon_bridge_table.css';
 
@@ -131,22 +131,18 @@ const rowClassRules = { 'mb-row-disabled': (params) => !!params.data?.disabled }
 const MormonBridgeTable = ({ scoreData, cols, setScoreData, disabledPlayers }) => {
   const smallScreen = useSmallScreen();
 
-  /* Writes the entered value into the sheet and re-scores the round. Both are
-     mutations of the cell already in the sheet, so the value the grid renders and
-     the value that gets submitted can't drift apart. The total is the one thing
-     outside this cell that moves, and it's repainted on its own — asking the grid
-     to redraw the row would take the focus out of the input being typed into. */
+  /* Writes the entered value into the sheet and re-scores the round — through the
+     same helper Auto Step writes with, so the two ways of entering a bid can't
+     drift apart. The total is the one thing outside this cell that moves, and it's
+     repainted on its own: asking the grid to redraw the row would take the focus
+     out of the input being typed into. */
   const onEnter = useCallback((node, round, field, entered) => {
     const playerRounds = scoreData.get(node.data.player);
     if (!playerRounds) {
       return;
     }
 
-    const cell = playerRounds.get(round) ?? emptyCell();
-    cell[field] = entered;
-    cell.score = roundScore(round, cell.bid, cell.took);
-    playerRounds.set(round, cell);
-
+    setCellValue(scoreData, node.data.player, round, field, entered);
     node.setDataValue('total', mbRowTotal(playerRounds, cols), TOTAL_SOURCE);
   }, [scoreData, cols]);
 
@@ -161,14 +157,9 @@ const MormonBridgeTable = ({ scoreData, cols, setScoreData, disabledPlayers }) =
       return;
     }
 
-    const tricks = Number(round);
     for (const field of ['bid', 'took']) {
-      const entered = Math.floor(Number(cell[field]));
-      if (cell[field] !== '' && Number.isFinite(entered)) {
-        cell[field] = String(Math.min(Math.max(entered, 0), tricks));
-      }
+      setCellValue(scoreData, node.data.player, round, field, clampToRound(cell[field], round));
     }
-    cell.score = roundScore(round, cell.bid, cell.took);
 
     node.setDataValue('total', mbRowTotal(playerRounds, cols), TOTAL_SOURCE);
     setScoreData(new Map(scoreData));
@@ -209,16 +200,20 @@ const MormonBridgeTable = ({ scoreData, cols, setScoreData, disabledPlayers }) =
 
   const getRowId = useCallback((params) => params.data.player, []);
 
-  /* Removing a player changes a flag on the row rather than any cell's value, and
-     AG Grid only redraws a cell whose value moved — so the wedges would stay
-     typeable until something else happened to repaint them. This is the ask for
-     that repaint. The rows themselves have already been updated by the time it
-     runs: the grid takes its new rowData in an effect of its own, and that's a
-     child of this one. */
+  /* Two things move a cell without moving its value, and AG Grid only redraws a
+     cell whose value moved. Removing a player sets a flag on the row. Auto Step
+     writes into the cell object the grid was already handed, so the object it
+     compares is the object it has. Either way the wedges would go on showing what
+     they showed until something else happened to repaint them, so this is the ask.
+
+     The rows themselves have already been updated by the time it runs: the grid
+     takes its new rowData in an effect of its own, and that's a child of this one.
+     On the first pass there's no grid to ask yet, and typing into a cell doesn't
+     move the sheet's identity, so it can't pull the focus out of one. */
   const gridApi = useRef(null);
   useEffect(() => {
     gridApi.current?.refreshCells({ force: true });
-  }, [disabledPlayers]);
+  }, [disabledPlayers, scoreData]);
 
   return (
     <SheetGrid

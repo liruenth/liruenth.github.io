@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import MormonBridgeTable from './mormon_bridge_table'
+import AutoStepModal from './AutoStepModal'
 import ActionsMenu from '../common/ActionsMenu'
 import ConfirmModal from '../common/ConfirmModal'
 import RemovePlayerModal from '../common/RemovePlayerModal'
@@ -29,14 +30,26 @@ function MormonBridge({players, scoreData, setScoreData, onSubmitGame, onNewGame
   /* Built once per game so entered scores survive re-renders. A restored sheet
      brings its own scores; a new game starts every round of every player blank.
 
-     Never replaced, unlike Contract Rummy's: nothing here adds a player or
-     re-ranks the rows, and the order they were entered in is the order they're
-     sitting in, which is what the bidding follows. Cell edits mutate this Map in
-     place and hand a copy of it up to be saved. */
-  const [scores] = useState(() => scoreData ?? emptySheet(players));
+     Its contents are mutated in place — that's what lets the grid keep drawing
+     off the same cell objects it was handed — so the identity only moves when
+     something outside the grid has written, which is Auto Step. Nothing here ever
+     reorders it: the order the players were entered in is the order they're
+     sitting in, and that's what the bidding follows. */
+  const [scores, setScores] = useState(() => scoreData ?? emptySheet(players));
   const [removed, setRemoved] = useState(readRemoved);
+  const [autoStepping, setAutoStepping] = useState(false);
   const [removingPlayer, setRemovingPlayer] = useState(false);
   const [startingNewGame, setStartingNewGame] = useState(false);
+
+  /* Auto Step writes into the sheet from outside the grid, so the grid has to be
+     handed a Map it can tell apart from the one it already has or it won't rebuild
+     its rows. The same swap is what pushes the sheet up to ScoreSheet to be saved,
+     so a run survives a refresh. */
+  const scoresChanged = () => {
+    const next = new Map(scores);
+    setScores(next);
+    setScoreData(next);
+  };
 
   useEffect(() => {
     sessionStorage.setItem(REMOVED_KEY, JSON.stringify([...removed]));
@@ -58,12 +71,10 @@ function MormonBridge({players, scoreData, setScoreData, onSubmitGame, onNewGame
       <ActionsMenu>
         {(closeMenu) => (
           <>
-            {/* TODO: the bid-then-took modal specced in README.md. Closing the
-                menu is all it does for now, so the action has its slot. */}
             <button
               type="button"
               className="actions-menu-item"
-              onClick={closeMenu}
+              onClick={() => { setAutoStepping(true); closeMenu(); }}
             >
               Auto Step
             </button>
@@ -95,6 +106,15 @@ function MormonBridge({players, scoreData, setScoreData, onSubmitGame, onNewGame
         setScoreData={setScoreData}
         disabledPlayers={removed}
       />
+      {autoStepping &&
+        <AutoStepModal
+          scores={scores}
+          cols={cols}
+          removed={removed}
+          onEntered={scoresChanged}
+          onClose={() => setAutoStepping(false)}
+        />
+      }
       {removingPlayer &&
         <RemovePlayerModal
           players={[...scores.keys()]}
