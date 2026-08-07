@@ -1,8 +1,4 @@
 TODO
-- implementing groups would require the following algorithm
-   - divide rows by groups and grab the remainder
-   - use the floor + 1 for each remainder rows
-   - use the floor for every row after
 - figure out other stats, filters and sortings to add to the stats page
 - maybe add a records tab with stuff like lowest score, highest score and a way to enable viewing of that game??
 

@@ -1,0 +1,19 @@
+/*
+Where one group of players ends and the next begins. Scoped under .grid-container
+like every other grid rule — see the note at the top of common/Table.css.
+*/
+
+/* A row's bottom border is drawn on the three cell containers inside it, all from
+   this one custom property, so setting it on the row reaches the frozen name and
+   total columns as well as the rounds between them. Twice the theme's own width, to
+   read as a divider rather than as the line between any two rows.
+
+   The border sits inside the row's height rather than adding to it, and the height a
+   cell centres its text in is the row's less its border — worked out on the row
+   itself, off the width below. Which the theme sets from its own border, so a
+   thicker line has to say so here or this row's numbers would sit low by the
+   difference. */
+.grid-container .ag-row.cr-group-end {
+  --ag-row-border: 2px solid var(--accent);
+  --ag-internal-row-border-width: 2px;
+}

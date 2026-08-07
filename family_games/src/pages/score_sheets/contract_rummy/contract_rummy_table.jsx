@@ -17,8 +17,14 @@ import {
   TOTAL_SOURCE
 } from '../common/sheetGrid';
 import { rowTotal, columnComplete, sortedByTotal } from '../../../helpers/scoring';
+import { groupEndRows } from '../../../helpers/groups';
+import './contract_rummy_table.css';
 
-const ContractRummyTable = ({scoreData, cols, setScoreData, autoSortTable, onReorder}) => {
+// Draws the line under the last row of a group. Static, since it reads the flag off
+// the row rather than closing over the count the rows were split by.
+const rowClassRules = { 'cr-group-end': (params) => !!params.data?.groupEnd };
+
+const ContractRummyTable = ({scoreData, cols, setScoreData, autoSortTable, onReorder, numGroups = 1}) => {
   const smallScreen = useSmallScreen();
 
   const columnDefs = useMemo(() => {
@@ -43,10 +49,19 @@ const ContractRummyTable = ({scoreData, cols, setScoreData, autoSortTable, onReo
     ];
   }, [cols, smallScreen]);
 
-  // Keyed on the Map's identity, which changes when the roster or the row order
-  // does — so adding a player or re-ranking rebuilds the rows, while cell edits
-  // (which mutate in place) leave them untouched.
-  const rowData = useMemo(() => buildRows(scoreData, cols, rowTotal), [scoreData, cols]);
+  /* Keyed on the Map's identity, which changes when the roster or the row order
+     does — so adding a player or re-ranking rebuilds the rows, while cell edits
+     (which mutate in place) leave them untouched.
+
+     Groups split the sheet by position rather than by player: the boundaries fall on
+     the same rows however the ranking moves, so the flag rides on the row and is
+     worked out again each time the rows are. */
+  const rowData = useMemo(() => {
+    const rows = buildRows(scoreData, cols, rowTotal);
+    const groupEnds = groupEndRows(rows.length, numGroups);
+
+    return rows.map((row, index) => ({ ...row, groupEnd: groupEnds.has(index) }));
+  }, [scoreData, cols, numGroups]);
 
   // Lets AG Grid move existing rows on a re-sort instead of rebuilding them all
   const getRowId = useCallback((params) => params.data.player, []);
@@ -88,6 +103,7 @@ const ContractRummyTable = ({scoreData, cols, setScoreData, autoSortTable, onReo
       columnDefs={columnDefs}
       rowData={rowData}
       getRowId={getRowId}
+      rowClassRules={rowClassRules}
       onCellValueChanged={onCellValueChanged}
     />
   );

@@ -100,10 +100,13 @@ function ScoreSheet() {
   // for it again. The effects above only write when their value is truthy, so
   // they leave the old sheet in sessionStorage rather than clearing it — hence
   // removing it here. Players aren't stored under a key of their own; they're
-  // read back off the sheet, so they're cleared with it.
+  // read back off the sheet, so they're cleared with it. Groups are written by
+  // Contract Rummy but cleared here with everything else, so the next game doesn't
+  // inherit the last one's split.
   const startNewGame = () => {
     sessionStorage.removeItem('scoreData');
     sessionStorage.removeItem('gameType');
+    sessionStorage.removeItem('numGroups');
     bumpGameId();
 
     setScoreData(null);

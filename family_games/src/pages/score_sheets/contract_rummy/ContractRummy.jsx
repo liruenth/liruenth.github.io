@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ContractRummyTable from './contract_rummy_table'
 import ActionsMenu from '../common/ActionsMenu'
 import AddPlayerModal from '../common/AddPlayerModal'
@@ -22,10 +22,22 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGam
   const [addingPlayer, setAddingPlayer] = useState(false);
   const [changingGroups, setChangingGroups] = useState(false);
   const [startingNewGame, setStartingNewGame] = useState(false);
-  const [numGroups, setNumGroups] = useState(1);
 
   // One group per player is as far as splitting them can go
   const maxGroups = Math.max(1, scores.size);
+
+  /* Kept for the session, so a refresh brings the groups back along with the scores
+     it restores. Read through the same clamp the modal saves through — the stored
+     count outlives the sheet it was picked for, and it's a plain string until it's
+     been checked. */
+  const [numGroups, setNumGroups] = useState(() => {
+    const saved = Math.floor(Number(sessionStorage.getItem('numGroups')));
+    return Number.isFinite(saved) && saved >= 1 ? Math.min(saved, maxGroups) : 1;
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem('numGroups', String(numGroups));
+  }, [numGroups]);
 
   // Swapping the Map for a new one is what lets the grid see a change to the
   // roster or to the row order — cell edits mutate it in place instead. Held here
@@ -98,6 +110,7 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGam
         setScoreData={setScoreData}
         autoSortTable={AUTO_SORT}
         onReorder={replaceScores}
+        numGroups={numGroups}
       />
       {addingPlayer &&
         <AddPlayerModal
