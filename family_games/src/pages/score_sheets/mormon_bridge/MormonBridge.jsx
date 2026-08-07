@@ -1,30 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import MormonBridgeTable from './mormon_bridge_table'
 import AutoStepModal from './AutoStepModal'
 import ActionsMenu from '../common/ActionsMenu'
 import ConfirmModal from '../common/ConfirmModal'
 import RemovePlayerModal from '../common/RemovePlayerModal'
 import SubmitGame from '../common/SubmitGame'
+import { useRemovedPlayers } from '../common/removedPlayers'
 import { emptySheet } from '../../../helpers/mormonBridge'
 import { roundsFor } from '../../../helpers/gameTypes'
 
 const cols = roundsFor('MB');
 
-/* Who's been taken out of play. Kept here rather than up in ScoreSheet — it's the
-   only game with the action — and so cleared here too, on the way into a new one.
-   Saved, because a refresh part-way through restores the sheet, and a roster that
-   quietly came back to life around the restored scores would be worse than not
-   restoring at all. */
+// This sheet's own key for who's out of play — see common/removedPlayers.js
 const REMOVED_KEY = 'mbRemovedPlayers';
-
-function readRemoved() {
-  try {
-    const saved = JSON.parse(sessionStorage.getItem(REMOVED_KEY) || '[]');
-    return new Set(Array.isArray(saved) ? saved : []);
-  } catch {
-    return new Set();
-  }
-}
 
 function MormonBridge({players, scoreData, setScoreData, onSubmitGame, onNewGame}) {
   /* Built once per game so entered scores survive re-renders. A restored sheet
@@ -36,7 +24,7 @@ function MormonBridge({players, scoreData, setScoreData, onSubmitGame, onNewGame
      reorders it: the order the players were entered in is the order they're
      sitting in, and that's what the bidding follows. */
   const [scores, setScores] = useState(() => scoreData ?? emptySheet(players));
-  const [removed, setRemoved] = useState(readRemoved);
+  const [removed, setRemoved, clearRemoved] = useRemovedPlayers(REMOVED_KEY);
   const [autoStepping, setAutoStepping] = useState(false);
   const [removingPlayer, setRemovingPlayer] = useState(false);
   const [startingNewGame, setStartingNewGame] = useState(false);
@@ -51,14 +39,8 @@ function MormonBridge({players, scoreData, setScoreData, onSubmitGame, onNewGame
     setScoreData(next);
   };
 
-  useEffect(() => {
-    sessionStorage.setItem(REMOVED_KEY, JSON.stringify([...removed]));
-  }, [removed]);
-
-  // The removals belong to the game that's finishing, so they go with it. Cleared
-  // here rather than in ScoreSheet, which doesn't know this key exists.
   const startNewGame = () => {
-    sessionStorage.removeItem(REMOVED_KEY);
+    clearRemoved();
     onNewGame();
   };
 

@@ -1,6 +1,7 @@
 /*
-Where one group of players ends and the next begins. Scoped under .grid-container
-like every other grid rule — see the note at the top of common/Table.css.
+Where one group of players ends and the next begins, and the row of a player who's
+been taken out of play. Scoped under .grid-container like every other grid rule —
+see the note at the top of common/Table.css.
 */
 
 /* A row's bottom border is drawn on the three cell containers inside it, all from
@@ -16,4 +17,21 @@ like every other grid rule — see the note at the top of common/Table.css.
 .grid-container .ag-row.cr-group-end {
   --ag-row-border: 2px solid var(--accent);
   --ag-internal-row-border-width: 2px;
+}
+
+/* A removed player. Their scores stay on the sheet and still submit — the row is out
+   of play, not gone — so the whole row is shaded rather than the rounds alone, the
+   frozen name and total included.
+
+   Darker than the shade Mormon Bridge gives its own: there the row is read against
+   cells that are wedges of colour anyway, while here it's the one thing marking a row
+   out on a sheet of plain numbers, and it has to hold that on its own. Which is also
+   why the fill is written out rather than shared with that sheet — and that one is
+   the colour of a closed wedge, which this sheet hasn't got.
+
+   The grid renders in a light theme whatever the page around it is doing, so black at
+   low opacity is the shade in both. Kept low enough that the numbers under it stay as
+   readable as the rest, since a removed player's scores are still part of the game. */
+.grid-container .cr-row-closed .ag-cell {
+  background: rgba(0, 0, 0, 0.14);
 }

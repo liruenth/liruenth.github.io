@@ -4,14 +4,20 @@ import ActionsMenu from '../common/ActionsMenu'
 import AddPlayerModal from '../common/AddPlayerModal'
 import ConfirmModal from '../common/ConfirmModal'
 import GroupsModal from '../common/GroupsModal'
+import RemovePlayerModal from '../common/RemovePlayerModal'
 import SubmitGame from '../common/SubmitGame'
+import { useRemovedPlayers } from '../common/removedPlayers'
 import { lastCompleteCol, averageTotal, sortedByTotal } from '../../../helpers/scoring'
 import { roundsFor } from '../../../helpers/gameTypes'
 
 const cols = roundsFor('CR');
 
-// Keep the sheet ranked by total. One flag for both places it applies: the grid
-// re-ranks as rounds finish, and adding a player re-ranks here.
+// This sheet's own key for who's out of play — see common/removedPlayers.js
+const REMOVED_KEY = 'crRemovedPlayers';
+
+// Keep the sheet ranked by total, with anyone out of play below the field. One flag
+// for every place it applies: the grid re-ranks as rounds finish, and adding or
+// removing a player re-ranks here.
 const AUTO_SORT = true;
 function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGame}) {
   // Built once per game so entered scores survive re-renders. A restored sheet
@@ -19,12 +25,18 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGam
   const [scores, setScores] = useState(() => scoreData ??
     new Map(players.map(player => [player, new Map()]))
   );
+  const [removed, setRemoved, clearRemoved] = useRemovedPlayers(REMOVED_KEY);
   const [addingPlayer, setAddingPlayer] = useState(false);
   const [changingGroups, setChangingGroups] = useState(false);
+  const [removingPlayer, setRemovingPlayer] = useState(false);
   const [startingNewGame, setStartingNewGame] = useState(false);
 
-  // One group per player is as far as splitting them can go
-  const maxGroups = Math.max(1, scores.size);
+  /* One group per player is as far as splitting them can go — counting only the ones
+     still in the game, since a removed row sits below the groups rather than in one.
+     An existing count that this drops below is left alone rather than lowered: putting
+     the player back would have no way to restore it. It's clamped again on the next
+     save, and a count past the rows just splits them as far as they'll go. */
+  const maxGroups = Math.max(1, scores.size - removed.size);
 
   /* Kept for the session, so a refresh brings the groups back along with the scores
      it restores. Read through the same clamp the modal saves through — the stored
@@ -47,15 +59,39 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGam
     setScoreData(next);
   };
 
+  /* Being taken out of play is itself a move in the ranking — it sends the row to the
+     bottom — so the sheet is re-ranked every time the list changes rather than only
+     when a round finishes. Which is also how a player put back rejoins it, on the
+     total they kept while they were out.
+
+     It covers the round finishing on the removal, too: if theirs was the last blank in
+     it, the round closes the moment they're out of play, with no edit left to come and
+     notice. */
+  const saveRemoved = (next) => {
+    setRemoved(next);
+
+    if (AUTO_SORT) {
+      replaceScores(sortedByTotal(scores, cols, next));
+    }
+  };
+
+  // The removals belong to the game that's finishing, so they go with it rather
+  // than carrying into the next one.
+  const startNewGame = () => {
+    clearRemoved();
+    onNewGame();
+  };
+
   const addPlayer = (player) => {
     // Shallow copy, so the inner per-player score Maps carry over untouched
     const next = new Map(scores);
     const startingScores = new Map();
 
     // Someone joining part-way starts level with the field rather than on zero,
-    // banked against the last round everyone has finished. The rounds they were
-    // never there for stay blank, so that round is the only one they're credited.
-    const joinedAt = lastCompleteCol(scores, cols);
+    // banked against the last round everyone still playing has finished. The rounds
+    // they were never there for stay blank, so that round is the only one they're
+    // credited.
+    const joinedAt = lastCompleteCol(scores, cols, removed);
     if (joinedAt) {
       startingScores.set(joinedAt, averageTotal(scores, cols));
     }
@@ -63,7 +99,7 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGam
     next.set(player, startingScores);
     // Their starting score is a real total, so slot them into the ranking rather
     // than leaving them on the bottom row until the next round finishes.
-    replaceScores(AUTO_SORT ? sortedByTotal(next, cols) : next);
+    replaceScores(AUTO_SORT ? sortedByTotal(next, cols, removed) : next);
   };
 
   return (
@@ -89,6 +125,13 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGam
             >
               Groups ({numGroups})
             </button>
+            <button
+              type="button"
+              className="actions-menu-item"
+              onClick={() => { setRemovingPlayer(true); closeMenu(); }}
+            >
+              Remove Player{removed.size ? ` (${removed.size})` : ''}
+            </button>
             <SubmitGame scores={scores} onSubmit={onSubmitGame} onSelect={closeMenu}/>
             <button
               type="button"
@@ -111,6 +154,7 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGam
         autoSortTable={AUTO_SORT}
         onReorder={replaceScores}
         numGroups={numGroups}
+        removedPlayers={removed}
       />
       {addingPlayer &&
         <AddPlayerModal
@@ -127,12 +171,20 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGam
           onClose={() => setChangingGroups(false)}
         />
       }
+      {removingPlayer &&
+        <RemovePlayerModal
+          players={[...scores.keys()]}
+          removed={removed}
+          onSave={saveRemoved}
+          onClose={() => setRemovingPlayer(false)}
+        />
+      }
       {startingNewGame &&
         <ConfirmModal
           heading="Start New Game"
           message="Do you want to start a new game?"
           confirmLabel="Start New Game"
-          onConfirm={onNewGame}
+          onConfirm={startNewGame}
           onClose={() => setStartingNewGame(false)}
         />
       }
