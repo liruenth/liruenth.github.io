@@ -1,0 +1,48 @@
+/* The dialog shell only. The button inside it uses .modal-actions, which
+   AddPlayerModal.css already defines unprefixed as a shared modal class, and the
+   tables inside it are GameTable's own — including the rule between two of them,
+   which comes from Stats.css. Both are already in the bundle: App.jsx imports the
+   score sheet and this page outright. */
+
+.record-modal {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  min-width: 280px;
+  text-align: left;
+
+  /* A dialog sizes itself against the viewport rather than against the column
+     the page is laid out in, and a ten-round game is wider than that column — so
+     left alone this would open wider than the page behind it. Capped, the
+     table's own scroller takes the overflow, exactly as it does on the page. */
+  max-width: min(1126px, calc(100vw - 32px));
+
+  /* A record several games are tied on is several full tables. Chrome's dialog
+     scrolls on its own; the spec doesn't ask it to, and a dialog that can't
+     scroll is one whose Close button is off the bottom of the screen. */
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+}
+
+.record-modal::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* Centred, unlike the shell around it: every game heading below this one is,
+   and a heading out of line with them reads as a mistake rather than a level. */
+.record-modal h2 {
+  margin-top: 0;
+  text-align: center;
+}
+
+/* Held against the foot of the dialog while the games scroll past, so the way
+   out doesn't have to be scrolled back to. */
+.record-modal .modal-actions {
+  position: sticky;
+  bottom: 0;
+  padding-top: 16px;
+  background: var(--bg);
+}

@@ -6,6 +6,7 @@ by the score sheet, which counts games on as they're finished.
 
 const GAME_ID_KEY = 'nextGameId';
 const GAME_DATE_KEY = 'date';
+const SUBMITTED_KEY = 'gameSubmitted';
 
 // Local date, not toISOString() — that reports UTC, which rolls the date over
 // early or late for anyone not on it.
@@ -32,6 +33,9 @@ export function currentGameId() {
   if (startedOn !== now) {
     sessionStorage.setItem(GAME_DATE_KEY, now);
     sessionStorage.setItem(GAME_ID_KEY, '1');
+    // The count starting over hands out an id nothing has been filed under yet,
+    // so what was submitted under yesterday's numbering doesn't stand for it.
+    sessionStorage.removeItem(SUBMITTED_KEY);
     return 1;
   }
 
@@ -43,4 +47,20 @@ export function currentGameId() {
 // failed attempt can be retried under the same id rather than burning one.
 export function bumpGameId() {
   sessionStorage.setItem(GAME_ID_KEY, String(currentGameId() + 1));
+  // The id just handed out has nothing filed under it yet
+  sessionStorage.removeItem(SUBMITTED_KEY);
+}
+
+/* Whether the id running now has made it onto a row. Stored alongside the id and
+   for the same reason: a refresh mid-game mustn't lose it, or the game would look
+   unsubmitted and the next one would be filed on top of it.
+
+   Set on a submit landing rather than on one being attempted, so a failure leaves
+   the id as unused as it was — the same thing the id itself is counted on late for. */
+export function markGameSubmitted() {
+  sessionStorage.setItem(SUBMITTED_KEY, '1');
+}
+
+export function gameSubmitted() {
+  return sessionStorage.getItem(SUBMITTED_KEY) === '1';
 }

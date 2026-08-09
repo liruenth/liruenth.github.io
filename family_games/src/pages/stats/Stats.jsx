@@ -16,7 +16,7 @@ import {
   allPlayers,
   applyFilters,
   sortGames,
-  careerTotals,
+  playerBoards,
   titleCase,
   EMPTY_FILTERS,
   DEFAULT_SORT,
@@ -114,7 +114,9 @@ function Stats() {
               {visible.map((game) => <GameTable key={game.key} game={game} />)}
             </div>
           )
-          : <PlayerTotals totals={careerTotals(visible)} />
+          // Built here rather than beside `visible`, so the stack of games isn't
+          // walked round by round for a table it isn't showing.
+          : <PlayerTotals boards={playerBoards(visible)} />
       )}
     </section>
   )

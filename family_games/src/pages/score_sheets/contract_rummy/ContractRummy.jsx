@@ -15,10 +15,6 @@ const cols = roundsFor('CR');
 // This sheet's own key for who's out of play — see common/removedPlayers.js
 const REMOVED_KEY = 'crRemovedPlayers';
 
-// Keep the sheet ranked by total, with anyone out of play below the field. One flag
-// for every place it applies: the grid re-ranks as rounds finish, and adding or
-// removing a player re-ranks here.
-const AUTO_SORT = true;
 function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGame}) {
   // Built once per game so entered scores survive re-renders. A restored sheet
   // brings its own scores; a new game starts every player empty.
@@ -51,6 +47,14 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGam
     sessionStorage.setItem('numGroups', String(numGroups));
   }, [numGroups]);
 
+  /* Keep the sheet ranked by total, with anyone out of play below the field — but only
+     while it's split into groups, since where the boundaries fall is the whole reason
+     the rows need ordering. On a single group the sheet is read as one list and the
+     order is the players' own, so it's left the way they arranged it. One flag for
+     every place the ranking applies: the grid re-ranks as rounds finish, and adding or
+     removing a player re-ranks here. */
+  const autoSort = numGroups > 1;
+
   // Swapping the Map for a new one is what lets the grid see a change to the
   // roster or to the row order — cell edits mutate it in place instead. Held here
   // as well as in ScoreSheet so the grid gets the new one as a prop.
@@ -70,7 +74,7 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGam
   const saveRemoved = (next) => {
     setRemoved(next);
 
-    if (AUTO_SORT) {
+    if (autoSort) {
       replaceScores(sortedByTotal(scores, cols, next));
     }
   };
@@ -99,7 +103,7 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGam
     next.set(player, startingScores);
     // Their starting score is a real total, so slot them into the ranking rather
     // than leaving them on the bottom row until the next round finishes.
-    replaceScores(AUTO_SORT ? sortedByTotal(next, cols, removed) : next);
+    replaceScores(autoSort ? sortedByTotal(next, cols, removed) : next);
   };
 
   return (
@@ -151,7 +155,7 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGam
         scoreData={scores}
         cols={cols}
         setScoreData={setScoreData}
-        autoSortTable={AUTO_SORT}
+        autoSortTable={autoSort}
         onReorder={replaceScores}
         numGroups={numGroups}
         removedPlayers={removed}

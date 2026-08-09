@@ -3,7 +3,12 @@ import ContractRummy from './contract_rummy/ContractRummy';
 import MormonBridge from './mormon_bridge/MormonBridge';
 import StartNewGame from './common/StartNewGame';
 import { submitScores } from '../../api/routes';
-import { currentGameId, bumpGameId } from '../../helpers/gameId';
+import {
+  currentGameId,
+  bumpGameId,
+  gameSubmitted,
+  markGameSubmitted
+} from '../../helpers/gameId';
 
 /* A sheet is Maps inside Maps, which JSON has no notion of, so each one is
    written out marked as what it is and read back by that mark.
@@ -92,9 +97,12 @@ function ScoreSheet() {
 
   // Sends the finished game to DynamoDB. The sheet is passed in rather than read
   // from state: the game holds the live copy, and ours only catches up once a
-  // cell edit pushes it back here. Errors are left to the caller to show.
-  const submitGame = (sheet) =>
-    submitScores(familyName, gameType, sheet ?? scoreData, currentGameId());
+  // cell edit pushes it back here. Errors are left to the caller to show — the
+  // rejection carries through, so a failed submit leaves the id unclaimed.
+  const submitGame = async (sheet) => {
+    await submitScores(familyName, gameType, sheet ?? scoreData, currentGameId());
+    markGameSubmitted();
+  };
 
   // Back to choosing a game, with the family kept so the next sheet doesn't ask
   // for it again. The effects above only write when their value is truthy, so
@@ -103,11 +111,18 @@ function ScoreSheet() {
   // read back off the sheet, so they're cleared with it. Groups are written by
   // Contract Rummy but cleared here with everything else, so the next game doesn't
   // inherit the last one's split.
+  //
+  // The id is only counted on if something was filed under it. A game abandoned
+  // without being submitted leaves it free, so the next one takes it rather than
+  // opening a gap in the day's numbering.
   const startNewGame = () => {
     sessionStorage.removeItem('scoreData');
     sessionStorage.removeItem('gameType');
     sessionStorage.removeItem('numGroups');
-    bumpGameId();
+
+    if (gameSubmitted()) {
+      bumpGameId();
+    }
 
     setScoreData(null);
     setGameType(null);

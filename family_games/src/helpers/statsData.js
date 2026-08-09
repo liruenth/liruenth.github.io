@@ -14,7 +14,7 @@ every string is uppercased, and the fields are renamed (`player`, not
 */
 import { rowTotal, sortedByTotal } from './scoring';
 import { mbRowTotal } from './mormonBridge';
-import { roundsFor, winsWith, roundCellFor, rowOrderFor } from './gameTypes';
+import { roundsFor, winsWith, roundCellFor, rowOrderFor, GAME_TYPE_IDS } from './gameTypes';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -194,53 +194,142 @@ export function gamesPerDay(games) {
   return perDay;
 }
 
-/* What each player has to show for every game in the list. Recomputed from the
-   filtered list, so it answers for what's on screen rather than for all time.
+/* ---------------------------------------------------------------------------
+   The player boards: what each player has to show, a board per game type.
 
-   Only the wins compare across types. A total means something different in each
-   game — and best and worst are which way its own type counts, so a board over
-   two of them is stating them in two units at once. That board is read by
-   filtering to one type; wins are the column that holds either way. */
-export function careerTotals(games) {
-  const byPlayer = new Map();
+   Split by type because almost nothing here compares across them. A total means
+   a different thing in each game, the low one wins Contract Rummy and the high
+   one takes Mormon Bridge, and a bid is a thing only one of them has — so a
+   single board over both would be stating half its columns in two units at once.
+   One board per type is what lets the columns mean what they say.
+   --------------------------------------------------------------------------- */
+
+/* A record is a number and the games it was set in — the games rather than a
+   count, because the board makes each one a way into the sheet it happened on.
+
+   Beaten, it starts again on the new game; equalled, the game joins the ones
+   already holding it: a record two games are level on belongs to both, and
+   showing one of them would be picking. A game is only added once however many
+   of its rounds hit the mark, which is why the guard is on the key rather than
+   on the value. */
+function emptyRecord() {
+  return { value: null, games: [] };
+}
+
+function record(current, value, game, better) {
+  // Blank rounds read back as '' — a bid nobody entered, which Math.max would
+  // quietly count as a zero rather than skip.
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return;
+  }
+
+  if (current.value === null || better(value, current.value) === value) {
+    if (value !== current.value) {
+      current.value = value;
+      current.games = [];
+    }
+    if (!current.games.some((held) => held.key === game.key)) {
+      current.games.push(game);
+    }
+  }
+}
+
+/* Every value one player has on the board of one game, in the order the columns
+   want them. Read off the player's own row of the sheet rather than by walking
+   the type's round list, since that lists every round of the game whether it was
+   reached or not — a game that ended early would be read as rounds of undefined. */
+function addGame(stats, game, player, bidTook) {
+  const total = game.totals.get(player);
+
+  stats.gamesPlayed += 1;
+  stats.totalPoints += total;
+  if (game.winners.includes(player)) {
+    stats.wins += 1;
+  }
+
+  record(stats.records.lowestGameTotal, total, game, Math.min);
+  record(stats.records.highestGameTotal, total, game, Math.max);
+
+  for (const cell of game.scores.get(player).values()) {
+    if (bidTook) {
+      record(stats.records.highestScore, cell.score, game, Math.max);
+      record(stats.records.highestBid, cell.bid, game, Math.max);
+      record(stats.records.highestTook, cell.took, game, Math.max);
+    } else {
+      record(stats.records.highestScore, cell, game, Math.max);
+    }
+  }
+}
+
+function emptyStats(player) {
+  return {
+    player,
+    gamesPlayed: 0,
+    wins: 0,
+    totalPoints: 0,
+    records: {
+      lowestGameTotal: emptyRecord(),
+      highestGameTotal: emptyRecord(),
+      highestScore: emptyRecord(),
+      // Only a game whose round holds a bid and a took has these to record. The
+      // keys are here either way so the board reads them the same on both.
+      highestBid: emptyRecord(),
+      highestTook: emptyRecord(),
+    },
+  };
+}
+
+/* One board per type, ordered as GAME_TYPES lists them with anything unlisted
+   after — a type written before this app knew about it still gets a board, since
+   everything the board needs of a type falls back rather than failing.
+
+   Recomputed from the filtered list, so a board answers for what's on screen
+   rather than for all time. */
+export function playerBoards(games) {
+  const boards = new Map();
 
   for (const game of games) {
-    const better = winsWith(game.type) === 'high' ? Math.max : Math.min;
-    const worse = better === Math.max ? Math.min : Math.max;
+    if (!boards.has(game.type)) {
+      boards.set(game.type, new Map());
+    }
+
+    const byPlayer = boards.get(game.type);
+    const bidTook = roundCellFor(game.type) === 'bid-took';
 
     for (const player of game.players) {
-      const total = game.totals.get(player);
-
       if (!byPlayer.has(player)) {
-        byPlayer.set(player, {
-          player,
-          gamesPlayed: 0,
-          wins: 0,
-          totalPoints: 0,
-          bestGame: total,
-          worstGame: total,
-        });
+        byPlayer.set(player, emptyStats(player));
       }
-
-      const stats = byPlayer.get(player);
-      stats.gamesPlayed += 1;
-      stats.totalPoints += total;
-      stats.bestGame = better(stats.bestGame, total);
-      stats.worstGame = worse(stats.worstGame, total);
-
-      if (game.winners.includes(player)) {
-        stats.wins += 1;
-      }
+      addGame(byPlayer.get(player), game, player, bidTook);
     }
   }
 
+  const order = (type) => {
+    const index = GAME_TYPE_IDS.indexOf(type);
+    return index === -1 ? GAME_TYPE_IDS.length : index;
+  };
+
+  return [...boards.entries()]
+    .sort(([a], [b]) => order(a) - order(b) || String(a).localeCompare(String(b)))
+    .map(([type, byPlayer]) => ({ type, rows: boardRows(type, byPlayer) }));
+}
+
+/* Most wins leads; level on wins, the better average is ahead — which way that
+   is being the type's own, now there's a board per type to ask.
+
+   The win rate is kept as the ratio it is and turned into a percentage where
+   it's shown: rounded here it would be a coarser number than the one it came
+   from, and two players a game apart would read as level. */
+function boardRows(type, byPlayer) {
+  const ahead = winsWith(type) === 'high' ? -1 : 1;
+
   return [...byPlayer.values()]
-    .map((stats) => ({
+    .map(({ totalPoints, ...stats }) => ({
       ...stats,
-      avgTotal: Math.round(stats.totalPoints / stats.gamesPlayed),
+      winRate: stats.wins / stats.gamesPlayed,
+      avgTotal: Math.round(totalPoints / stats.gamesPlayed),
     }))
-    // Most wins leads; level on wins, the lower average is ahead.
-    .sort((a, b) => b.wins - a.wins || a.avgTotal - b.avgTotal);
+    .sort((a, b) => b.wins - a.wins || ahead * (a.avgTotal - b.avgTotal));
 }
 
 export const EMPTY_FILTERS = {

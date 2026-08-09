@@ -99,6 +99,38 @@ light mode.
   background-image: linear-gradient(var(--accent-bg), var(--accent-bg));
 }
 
+/* A record on a player board, and the way into the game it was set in. The
+   padding comes off the cell and goes onto the button so the whole cell is the
+   tap target rather than just the digits inside it.
+
+   Not .link-button, which is the same look but carries a left margin and a size
+   of its own — both of which are what that class is for in a line of prose, and
+   both of which would put a number off-centre in its column. */
+.stats-table td.stats-record-cell {
+  padding: 0;
+}
+
+/* A button takes neither the table's font nor its colour from what it's in */
+.stats-table .stats-record {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 12px;
+  font: inherit;
+  color: var(--accent);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Drawn inside its own edge: the cell has no padding left to hold a ring, so an
+   outward one would sit on top of the neighbouring cell's border. */
+.stats-table .stats-record:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 /* A Mormon Bridge round: the bid and took in the top corners and the score across
    the bottom, drawn as the same three triangles the sheet draws (round_cell.css).
    The wedges have to reach the cell's edges, so the padding every other cell gets

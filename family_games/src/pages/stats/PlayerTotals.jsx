@@ -1,47 +1,37 @@
-import './StatsTable.css'
-import { titleCase } from '../../helpers/statsData'
+import { useState } from 'react'
+import PlayerBoard from './PlayerBoard'
+import RecordModal from './RecordModal'
 
 /* What each player has to show across every game currently on screen. Built from
    the filtered list, so narrowing to a date range answers for that range rather
    than quietly for all time.
 
-   Best and worst are whichever way the game counts — the low total wins Contract
-   Rummy, the high one takes Mormon Bridge — so a board covering both states them
-   in two units at once. Wins are the column that holds either way. */
-function PlayerTotals({ totals }) {
-  return (
-    <article className="game-block">
-      <h2>Player Totals</h2>
+   A board per game type, because that's the only way its columns can mean one
+   thing each — see playerBoards in helpers/statsData.js.
 
-      <div className="stats-table-scroll">
-        <table className="stats-table">
-          <thead>
-            <tr>
-              <th scope="col" className="stats-table-name">Player</th>
-              <th scope="col">Games</th>
-              <th scope="col">Wins</th>
-              <th scope="col">Average</th>
-              <th scope="col" title="Best total, whichever way the game counts">Best</th>
-              <th scope="col" title="Worst total, whichever way the game counts">Worst</th>
-              <th scope="col" className="stats-table-total">Points</th>
-            </tr>
-          </thead>
-          <tbody>
-            {totals.map((stats) => (
-              <tr key={stats.player}>
-                <th scope="row" className="stats-table-name">{titleCase(stats.player)}</th>
-                <td>{stats.gamesPlayed}</td>
-                <td>{stats.wins}</td>
-                <td>{stats.avgTotal}</td>
-                <td>{stats.bestGame}</td>
-                <td>{stats.worstGame}</td>
-                <td className="stats-table-total">{stats.totalPoints}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+   The record a reader opened is held here rather than in the board that raised
+   it, so there's one dialog over the page however many boards are under it. */
+function PlayerTotals({ boards }) {
+  const [record, setRecord] = useState(null);
+
+  return (
+    <>
+      {/* The same wrapper the stack of games uses, so two boards are spaced the
+          way two games are — left bare they'd take the page's own gap as well. */}
+      <div className="game-list">
+        {boards.map((board) => (
+          <PlayerBoard key={board.type} board={board} onRecord={setRecord} />
+        ))}
       </div>
-    </article>
+
+      {record && (
+        <RecordModal
+          heading={record.heading}
+          games={record.games}
+          onClose={() => setRecord(null)}
+        />
+      )}
+    </>
   );
 }
 
