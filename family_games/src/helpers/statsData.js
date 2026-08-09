@@ -95,7 +95,9 @@ function buildGame(gameId, type, rows) {
      leaving the winner the top row of either. Everyone level with the winning
      total won it: a tie is a tie, not whichever of them the sort put first. */
   const high = winsWith(type) === 'high';
-  const ascending = [...sortedByTotal(scores, rounds, total).keys()];
+  // Nobody is out of play in a finished game — a player removed while it was on
+  // has the rows they played and is ranked on them like anyone else.
+  const ascending = [...sortedByTotal(scores, rounds, null, total).keys()];
   const ranked = high ? [...ascending].reverse() : ascending;
   const winningTotal = high ? highestTotal : lowestTotal;
   const winners = ranked.filter((player) => totals.get(player) === winningTotal);
