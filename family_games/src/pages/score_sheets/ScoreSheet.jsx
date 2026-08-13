@@ -9,6 +9,7 @@ import {
   gameSubmitted,
   markGameSubmitted
 } from '../../helpers/gameId';
+import { GROUPS_KEY } from '../../helpers/groups';
 
 /* A sheet is Maps inside Maps, which JSON has no notion of, so each one is
    written out marked as what it is and read back by that mark.
@@ -27,11 +28,11 @@ function mapReviver(key, value) {
 }
 
 /* A sheet saved before the marks above were written is unreadable now. There's
-   nothing to migrate — it's a game in progress in one tab, not history — so it's
-   dropped and that tab starts over rather than restoring something the sheet
-   can't use. */
+   nothing to migrate — it's a game in progress, not history, and history lives in
+   DynamoDB — so it's dropped and the sheet starts over rather than restoring
+   something it can't use. */
 function restoreScoreData() {
-  const saved = sessionStorage.getItem('scoreData');
+  const saved = localStorage.getItem('scoreData');
   if (!saved) {
     return null;
   }
@@ -47,7 +48,7 @@ function restoreScoreData() {
 function ScoreSheet() {
   const [scoreData, setScoreData] = useState(restoreScoreData);
   const [familyName, setFamilyName] = useState(() => {
-    let savedFamilyName = sessionStorage.getItem('familyName');
+    let savedFamilyName = localStorage.getItem('familyName');
     if (!!savedFamilyName) {
       return savedFamilyName;
     }
@@ -59,9 +60,9 @@ function ScoreSheet() {
   // empty, and a stale name left behind would come back on the next refresh.
   useEffect(() => {
     if (!!familyName) {
-      sessionStorage.setItem('familyName', familyName);
+      localStorage.setItem('familyName', familyName);
     } else {
-      sessionStorage.removeItem('familyName');
+      localStorage.removeItem('familyName');
     }
   }, [familyName]);
 
@@ -76,12 +77,12 @@ function ScoreSheet() {
   
   useEffect(() => {
     if (!!scoreData) {
-      sessionStorage.setItem('scoreData', JSON.stringify(scoreData, mapReplacer));
+      localStorage.setItem('scoreData', JSON.stringify(scoreData, mapReplacer));
     }
   }, [scoreData]);
   
   const [gameType, setGameType] = useState(() => {
-    let savedGameType = sessionStorage.getItem('gameType');
+    let savedGameType = localStorage.getItem('gameType');
     if (!!savedGameType) {
       return savedGameType;
     }
@@ -91,7 +92,7 @@ function ScoreSheet() {
   
   useEffect(() => {
     if (!!gameType) {
-      sessionStorage.setItem('gameType', gameType);
+      localStorage.setItem('gameType', gameType);
     }
   }, [gameType]);
 
@@ -106,19 +107,19 @@ function ScoreSheet() {
 
   // Back to choosing a game, with the family kept so the next sheet doesn't ask
   // for it again. The effects above only write when their value is truthy, so
-  // they leave the old sheet in sessionStorage rather than clearing it — hence
+  // they leave the old sheet in storage rather than clearing it — hence
   // removing it here. Players aren't stored under a key of their own; they're
-  // read back off the sheet, so they're cleared with it. Groups are written by
-  // Contract Rummy but cleared here with everything else, so the next game doesn't
-  // inherit the last one's split.
+  // read back off the sheet, so they're cleared with it. Groups are written by the
+  // roster screen and by Contract Rummy but cleared here with everything else, so
+  // the next game doesn't inherit the last one's split.
   //
   // The id is only counted on if something was filed under it. A game abandoned
   // without being submitted leaves it free, so the next one takes it rather than
   // opening a gap in the day's numbering.
   const startNewGame = () => {
-    sessionStorage.removeItem('scoreData');
-    sessionStorage.removeItem('gameType');
-    sessionStorage.removeItem('numGroups');
+    localStorage.removeItem('scoreData');
+    localStorage.removeItem('gameType');
+    localStorage.removeItem(GROUPS_KEY);
 
     if (gameSubmitted()) {
       bumpGameId();

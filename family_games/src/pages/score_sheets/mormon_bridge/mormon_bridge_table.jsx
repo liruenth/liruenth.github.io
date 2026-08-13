@@ -29,6 +29,8 @@ import {
 } from '../common/sheetGrid';
 import RoundWedges from './RoundWedges';
 import { mbRowTotal, setCellValue, clampToRound } from '../../../helpers/mormonBridge';
+import { positionsByTotal } from '../../../helpers/scoring';
+import { winsWith } from '../../../helpers/gameTypes';
 import './round_cell.css';
 import './mormon_bridge_table.css';
 
@@ -118,6 +120,25 @@ function RoundCell({ data, value, colDef, node, onEnter, onCommit }) {
   );
 }
 
+/* The player's name with where they stand beside it, so the sheet says who's
+   winning without moving anyone: the rows are the seating and can't be reordered
+   — see the note above NO_REORDER — which is the whole reason the position has to
+   be written on the row rather than shown by it.
+
+   A superscript rather than a column of its own: it's read alongside the name,
+   and the pinned column is already the narrowest thing on a phone. */
+function PlayerCell({ data }) {
+  return (
+    <span className="mb-player">
+      {/* The name is its own element so it's the part that gets cut short on a
+          narrow column — a place trimmed off the end would be the half of this
+          the row can't say any other way. */}
+      <span className="mb-player-name">{data.player}</span>
+      {data.position ? <sup className="mb-position">{data.position}</sup> : null}
+    </span>
+  );
+}
+
 // The same three wedges as a cell, so the columns read as what's under them:
 // which side is the bid, which the took, and the round across the bottom.
 function RoundHeader({ round }) {
@@ -169,7 +190,9 @@ const MormonBridgeTable = ({ scoreData, cols, setScoreData, disabledPlayers }) =
     const { playerCol, totalCol } = pinnedColumnDefs(smallScreen);
 
     return [
-      playerCol,
+      // The position rides on the row rather than in these params, so a re-scored
+      // sheet doesn't rebuild every column to show a place that moved.
+      { ...playerCol, cellRenderer: PlayerCell },
       ...cols.map((round) => ({
         field: round,
         // Ours is the editing here — see the note at the top of the file. And
@@ -191,12 +214,18 @@ const MormonBridgeTable = ({ scoreData, cols, setScoreData, disabledPlayers }) =
     ];
   }, [cols, smallScreen, onEnter, onCommit]);
 
-  const rowData = useMemo(() => (
-    buildRows(scoreData, cols, mbRowTotal).map((row) => ({
+  /* Worked out here rather than in each row so the whole field is ranked once and
+     the places agree with each other — a place is only meaningful next to the
+     others it was worked out against. */
+  const rowData = useMemo(() => {
+    const positions = positionsByTotal(scoreData, cols, disabledPlayers, mbRowTotal, winsWith('MB'));
+
+    return buildRows(scoreData, cols, mbRowTotal).map((row) => ({
       ...row,
+      position: positions.get(row.player),
       disabled: disabledPlayers.has(row.player)
-    }))
-  ), [scoreData, cols, disabledPlayers]);
+    }));
+  }, [scoreData, cols, disabledPlayers]);
 
   const getRowId = useCallback((params) => params.data.player, []);
 

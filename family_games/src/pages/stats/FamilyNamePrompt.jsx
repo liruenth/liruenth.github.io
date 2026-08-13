@@ -6,7 +6,7 @@ import { useState } from 'react'
    name is prefilled and the ask is a single keystroke to confirm. */
 function FamilyNamePrompt({ storageKey, onSubmit }) {
   const [familyInput, setFamilyInput] = useState(
-    () => sessionStorage.getItem(storageKey) ?? ''
+    () => localStorage.getItem(storageKey) ?? ''
   );
 
   const submit = (e) => {

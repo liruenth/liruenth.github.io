@@ -12,7 +12,7 @@ import { useState, useEffect } from 'react'
 
 function readRemoved(storageKey) {
   try {
-    const saved = JSON.parse(sessionStorage.getItem(storageKey) || '[]');
+    const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
     return new Set(Array.isArray(saved) ? saved : []);
   } catch {
     return new Set();
@@ -26,10 +26,10 @@ export function useRemovedPlayers(storageKey) {
   const [removed, setRemoved] = useState(() => readRemoved(storageKey));
 
   useEffect(() => {
-    sessionStorage.setItem(storageKey, JSON.stringify([...removed]));
+    localStorage.setItem(storageKey, JSON.stringify([...removed]));
   }, [storageKey, removed]);
 
-  const clearRemoved = () => sessionStorage.removeItem(storageKey);
+  const clearRemoved = () => localStorage.removeItem(storageKey);
 
   return [removed, setRemoved, clearRemoved];
 }

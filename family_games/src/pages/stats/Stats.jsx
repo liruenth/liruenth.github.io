@@ -44,7 +44,7 @@ function Stats() {
      already up to say whose games are loading — and to offer the way back out if
      the request is the thing that fails. */
   const loadGames = async (name) => {
-    sessionStorage.setItem(FAMILY_KEY, name);
+    localStorage.setItem(FAMILY_KEY, name);
     setFamilyName(name);
     setLoading(true);
     setError(null);

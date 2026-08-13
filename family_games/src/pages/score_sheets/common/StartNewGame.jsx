@@ -7,7 +7,8 @@
 */
 import { useState, useEffect } from 'react'
 import { fetchFamilyPlayers } from '../../../api/routes'
-import { setupNoticeFor } from '../../../helpers/gameTypes'
+import { setupNoticeFor, hasGroups } from '../../../helpers/gameTypes'
+import { clampGroups, saveGroups } from '../../../helpers/groups'
 import './StartNewGame.css'
 
 // Used when the roster can't be read, so the flow stays usable. Not used for a
@@ -34,10 +35,19 @@ function StartNewGame({ gameType, familyName, setFamilyName, onConfirm }) {
   // this screen stays one screen however many games there end up being.
   const setupNotice = setupNoticeFor(gameType);
 
+  /* Whether this game splits its table, asked of the game for the same reason as
+     the notice above. The sheet can still change the count once it's open — this
+     is so the table opens split rather than being split after the fact. */
+  const splitsIntoGroups = hasGroups(gameType);
+
   const [familyInput, setFamilyInput] = useState('');
   const [players, setPlayers] = useState([]);
   const [selected, setSelected] = useState([]);
   const [newPlayer, setNewPlayer] = useState('');
+  /* Held as what was typed rather than as a number, and clamped on the way out —
+     the same reason GroupsModal does: correcting it on every keystroke would take
+     the first digit of a two-digit count away before the second one arrived. */
+  const [groups, setGroups] = useState('1');
   // Arriving with a family already set means the effect below is about to
   // fetch, so open in the loading state rather than flashing an empty roster.
   const [loading, setLoading] = useState(() => !!familyName);
@@ -119,6 +129,24 @@ function StartNewGame({ gameType, familyName, setFamilyName, onConfirm }) {
     setError(null);
   };
 
+  /* One group per player is as far as splitting them can go, which here is the
+     players picked so far — the roster is everyone who could play, not everyone
+     who is. It's the same ceiling the sheet applies, counted off the same rows. */
+  const maxGroups = Math.max(1, selected.length);
+
+  /* The count is handed over in storage rather than through onConfirm: it's read
+     back by the sheet from there anyway, so passing it as well would leave two
+     paths to the same number and a chance for them to disagree. Written only for
+     a game that splits — nothing else looks at it, but a stale count is what
+     ScoreSheet clears between games and there's no reason to write one back. */
+  const startGame = () => {
+    if (splitsIntoGroups) {
+      saveGroups(clampGroups(groups, maxGroups));
+    }
+
+    onConfirm(selected);
+  };
+
   const changeFamily = () => {
     setFamilyName('');
     setPlayers([]);
@@ -197,11 +225,29 @@ function StartNewGame({ gameType, familyName, setFamilyName, onConfirm }) {
         <button type="submit" disabled={!newPlayer.trim()}>Add</button>
       </form>
 
+      {/* .groups-field is the modal's own field, shared the way .modal-actions
+          already is — the sheet asks this same question mid-game, and the two
+          should look like the one question they are. */}
+      {splitsIntoGroups && (
+        <label className="groups-field" htmlFor="start-groups">
+          Groups
+          <input
+            id="start-groups"
+            type="number"
+            min="1"
+            max={maxGroups}
+            step="1"
+            value={groups}
+            onChange={(e) => setGroups(e.target.value)}
+          />
+        </label>
+      )}
+
       <button
         type="button"
         className="rummy"
         disabled={selected.length === 0}
-        onClick={() => onConfirm(selected)}
+        onClick={startGame}
       >
         Start Game ({selected.length})
       </button>

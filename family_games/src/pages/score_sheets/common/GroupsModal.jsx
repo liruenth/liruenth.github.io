@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { clampGroups } from '../../../helpers/groups'
 import './GroupsModal.css'
 
 function GroupsModal({ value, maxGroups, onSave, onClose }) {
@@ -17,10 +18,7 @@ function GroupsModal({ value, maxGroups, onSave, onClose }) {
   // without its first digit being corrected out from under you.
   const save = (e) => {
     e.preventDefault();
-    const entered = Math.floor(Number(groups));
-    onSave(
-      Number.isFinite(entered) && entered >= 1 ? Math.min(entered, maxGroups) : 1
-    );
+    onSave(clampGroups(groups, maxGroups));
     onClose();
   };
 

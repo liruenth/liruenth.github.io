@@ -20,6 +20,43 @@ the stats page uses as well.
   height: 100%;
 }
 
+/* The name and the place beside it. A flex row rather than one run of text, so
+   the name can be the part that's cut short when the column is too narrow for
+   both — AG Grid's own ellipsis is on the cell's text, which a component in the
+   cell isn't. */
+.grid-container .ag-cell .mb-player {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.grid-container .mb-player-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Smaller than the name — it's an annotation on the row, not a second thing the
+   row is called — but bold and red, so a couple of pixels of digit still carries.
+   The colour is a shade off pure red: the grid keeps Balham's light background
+   whatever the page around it is doing (see the note at the top of round_cell.css),
+   and this reads on it without going orange. Kept off the flex share so it's never
+   the part that loses its space.
+
+   Raised by hand rather than by <sup>'s own vertical-align, which a flex item
+   doesn't get — the tag is still what it is, but the lift has to be spelled out.
+   Off the baseline the two are aligned on, so it lands where a superscript does. */
+.grid-container .mb-player .mb-position {
+  flex: none;
+  font-size: 0.7em;
+  font-weight: 700;
+  color: #d32f2f;
+  padding-left: 1px;
+  position: relative;
+  top: -0.4em;
+}
+
 /* A removed player. Their rounds stay on the sheet and still submit — the row is
    out of play, not gone — so the whole row takes the shade a closed cell already
    has, rather than being faded into one of its own.

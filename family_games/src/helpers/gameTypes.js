@@ -26,6 +26,11 @@ export const GAME_TYPES = [
     wins: 'low',
     roundCell: 'score',
     rowOrder: 'rank',
+    setupNotice: 'Add players by group',
+    // The table can be split into groups, which is a thing the sheet offers and
+    // the roster screen asks for up front. Mormon Bridge doesn't say it, so it
+    // isn't asked there — see hasGroups below.
+    groups: true,
   },
   {
     id: 'MB',
@@ -64,6 +69,13 @@ export function roundsFor(id) {
 // only sheet there is, so it's the safer thing to guess for a type off this list.
 export function winsWith(id) {
   return gameType(id)?.wins ?? 'low';
+}
+
+// Whether this game splits its table into groups. No, for a type that hasn't
+// said: groups are one game's idea, so a type off this list isn't asked to
+// account for them.
+export function hasGroups(id) {
+  return gameType(id)?.groups === true;
 }
 
 // Anything the roster screen has to say about how this game wants its players

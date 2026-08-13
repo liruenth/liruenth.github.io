@@ -77,3 +77,41 @@ export function sortedByTotal(scoreData, cols, removed, total = rowTotal) {
 
   return new Map(ranked.map((player) => [player, scoreData.get(player)]));
 }
+
+/* Where everyone stands, as a place per player rather than as an order: the same
+   ranking sortedByTotal builds, for a sheet that shows a player's position beside
+   their name instead of moving their row to it.
+
+   Level totals share a place and the places after them are skipped — 1, 2, 2, 4 —
+   so a place is always "how many are ahead of you, plus one" rather than a count
+   of the distinct totals above.
+
+   `wins` is which end of the totals leads, since the games disagree; it takes what
+   helpers/gameTypes.js says. Out of play still ranks below the field for the same
+   reason it does there, and a removed player never shares a place with someone
+   still playing even on the same total. */
+export function positionsByTotal(scoreData, cols, removed, total = rowTotal, wins = 'low') {
+  const outOfPlay = (player) => (removed?.has(player) ? 1 : 0);
+  const rank = (player) => total(scoreData.get(player), cols);
+  const ahead = wins === 'high' ? -1 : 1;
+
+  const ranked = [...scoreData.keys()].sort((a, b) => (
+    outOfPlay(a) - outOfPlay(b) || ahead * (rank(a) - rank(b))
+  ));
+
+  const positions = new Map();
+  let place = 0;
+  let previous = null;
+
+  ranked.forEach((player, index) => {
+    const standing = `${outOfPlay(player)}:${rank(player)}`;
+    if (standing !== previous) {
+      place = index + 1;
+      previous = standing;
+    }
+
+    positions.set(player, place);
+  });
+
+  return positions;
+}

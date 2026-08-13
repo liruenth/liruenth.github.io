@@ -8,6 +8,7 @@ import RemovePlayerModal from '../common/RemovePlayerModal'
 import SubmitGame from '../common/SubmitGame'
 import { useRemovedPlayers } from '../common/removedPlayers'
 import { lastCompleteCol, averageTotal, sortedByTotal } from '../../../helpers/scoring'
+import { readGroups, saveGroups } from '../../../helpers/groups'
 import { roundsFor } from '../../../helpers/gameTypes'
 
 const cols = roundsFor('CR');
@@ -34,17 +35,14 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGam
      save, and a count past the rows just splits them as far as they'll go. */
   const maxGroups = Math.max(1, scores.size - removed.size);
 
-  /* Kept for the session, so a refresh brings the groups back along with the scores
-     it restores. Read through the same clamp the modal saves through — the stored
-     count outlives the sheet it was picked for, and it's a plain string until it's
-     been checked. */
-  const [numGroups, setNumGroups] = useState(() => {
-    const saved = Math.floor(Number(sessionStorage.getItem('numGroups')));
-    return Number.isFinite(saved) && saved >= 1 ? Math.min(saved, maxGroups) : 1;
-  });
+  /* Kept with the sheet, so a refresh brings the groups back along with the scores
+     it restores — and so the count picked on the roster screen before the game is
+     the one this opens on. Both ends go through helpers/groups.js, which is where
+     the clamp everything shares lives. */
+  const [numGroups, setNumGroups] = useState(() => readGroups(maxGroups));
 
   useEffect(() => {
-    sessionStorage.setItem('numGroups', String(numGroups));
+    saveGroups(numGroups);
   }, [numGroups]);
 
   /* Keep the sheet ranked by total, with anyone out of play below the field — but only
