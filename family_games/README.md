@@ -1,6 +1,8 @@
 TODO
-- figure out other stats, filters and sortings to add to the stats page
-- maybe add a records tab with stuff like lowest score, highest score and a way to enable viewing of that game??
+Import games by 
+- updating google sheet with the data (ensure everything is uppercase)
+- download and replace test_game.csv
+- then run `node import-csv.js`
 
 
 
