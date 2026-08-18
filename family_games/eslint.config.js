@@ -18,4 +18,11 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  /* Node, not the browser: the one-off scripts at the root and the handler in
+     src/api, which is deployed to Lambda rather than bundled into the app. Left
+     out, `process` and `Buffer` read as undefined globals. */
+  {
+    files: ['*.js', 'src/api/lambda.js'],
+    languageOptions: { globals: globals.node },
+  },
 ])

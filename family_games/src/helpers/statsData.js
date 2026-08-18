@@ -43,20 +43,14 @@ function storedNumber(value) {
     : Number(value);
 }
 
-/* A game's rows into the sheet that was played, plus what the stats page sorts
-   and filters on. Every round of the type gets a column, played or not, so games
-   stacked one under another line up rather than each being its own width — a game
-   that ended early is blank in the rounds it never reached, exactly as its sheet
-   looked. Rounds the type doesn't list are appended, so data written before a
-   round list changed still renders in full.
+/* What a game is read out of, whichever shape it arrived in: what each player
+   scored in each round, where they sat, and the rounds the game actually touched.
 
-   A cell is whatever that type's round holds — a score, or the bid and took with
-   the score worked out from them — so a rebuilt game is the same shape the sheet
-   works in either way, and totalled the way that sheet totals it. */
-function buildGame(gameId, type, rows) {
-  const bidTook = roundCellFor(type) === 'bid-took';
-  const total = bidTook ? mbRowTotal : rowTotal;
-
+   Two shapes, because the store is being changed underneath this. A game used to
+   be one row per player per round and is becoming one document per game; both
+   fold to the same three collections, so everything downstream of the fold is
+   written once and neither shape is the special case. */
+function foldRows(rows, bidTook) {
   const scores = new Map();
   const seats = new Map();
   const seenRounds = [];
@@ -79,6 +73,67 @@ function buildGame(gameId, type, rows) {
       seenRounds.push(row.round);
     }
   }
+
+  return { scores, seats, seenRounds };
+}
+
+/* The same three, from a game document.
+
+   `players` is a list rather than an object keyed by name so that its order
+   survives being stored: it is the order the rows used to arrive in, and a game
+   written before seats were stored has nothing else to say where its players
+   sat — which for Mormon Bridge is the order the bidding went round. */
+function foldPlayers(players, bidTook) {
+  const scores = new Map();
+  const seats = new Map();
+  const seenRounds = [];
+
+  for (const entry of players ?? []) {
+    const played = new Map();
+
+    for (const [round, cell] of Object.entries(entry.rounds ?? {})) {
+      played.set(round, bidTook
+        ? { bid: storedNumber(cell.bid), took: storedNumber(cell.took), score: Number(cell.score) }
+        : Number(cell.score));
+
+      if (!seenRounds.includes(round)) {
+        seenRounds.push(round);
+      }
+    }
+
+    scores.set(entry.player, played);
+
+    // Absent on a game folded from rows that predate seats, and left absent here
+    // rather than counted from the list — a position in the list is where the
+    // player is read back in, not a seat the game ever recorded.
+    if (storedNumber(entry.seat) !== '') {
+      seats.set(entry.player, Number(entry.seat));
+    }
+  }
+
+  return { scores, seats, seenRounds };
+}
+
+/* A game into the sheet that was played, plus what the stats page sorts and
+   filters on. Every round of the type gets a column, played or not, so games
+   stacked one under another line up rather than each being its own width — a game
+   that ended early is blank in the rounds it never reached, exactly as its sheet
+   looked. Rounds the type doesn't list are appended, so data written before a
+   round list changed still renders in full.
+
+   A cell is whatever that type's round holds — a score, or the bid and took with
+   the score worked out from them — so a rebuilt game is the same shape the sheet
+   works in either way, and totalled the way that sheet totals it.
+
+   `source` is either a game document or `{ rows }`; which one it is decides only
+   how the fold above reaches the scores. */
+function buildGame(gameId, type, source) {
+  const bidTook = roundCellFor(type) === 'bid-took';
+  const total = bidTook ? mbRowTotal : rowTotal;
+
+  const { scores, seats, seenRounds } = Array.isArray(source.players)
+    ? foldPlayers(source.players, bidTook)
+    : foldRows(source.rows, bidTook);
 
   const known = roundsFor(type);
   const rounds = [...known, ...seenRounds.filter((round) => !known.includes(round))];
@@ -125,7 +180,7 @@ function buildGame(gameId, type, rows) {
     key: `${gameId}#${type}`,
     gameId,
     gameNumber: counter === -1 ? null : gameId.slice(counter + 1),
-    date: rows[0]?.date ?? (counter === -1 ? gameId : gameId.slice(0, counter)),
+    date: source.date ?? source.rows?.[0]?.date ?? (counter === -1 ? gameId : gameId.slice(0, counter)),
     /* The other half of the id, kept apart from the date above. They say the same
        thing today, but the date shown is the row's and this one is the key's, and
        it is the key's that has to be sent back to file an edit under the game it
@@ -154,35 +209,54 @@ function buildGame(gameId, type, rows) {
 
 /* The history into a flat list of games, newest first.
 
-   Grouped from the rows rather than from the keys the response arrived under. Each
-   row names its own game, and taking the id from the row is what makes this
-   independent of how the endpoint chose to group — a handler grouping on an
-   attribute the rows don't carry answers one bucket called "undefined", and the
-   whole history would read as a single game.
+   Grouped from what each entry carries rather than from the keys the response
+   arrived under. Every entry names its own game, and taking the id from the entry
+   is what makes this independent of how the endpoint chose to group — a handler
+   grouping on an attribute the entries don't carry answers one bucket called
+   "undefined", and the whole history would read as a single game.
 
    Split by type as well as by id, because the id doesn't carry the type — it's
    the date and a counter within it — so the same id can come back from two types
    and mean two different games. Left merged they'd share a table and the rounds
-   of one would read as blanks in the other. */
+   of one would read as blanks in the other.
+
+   Both shapes the store answers in are accepted, since one is replacing the other
+   and a page load can land on either. A document is the whole of its game and
+   needs no gathering; the rows it is replacing have to be collected by the id and
+   type they each carry. */
 export function toGames(grouped) {
   const byGame = new Map();
 
-  for (const rows of Object.values(grouped ?? {})) {
-    for (const row of rows ?? []) {
-      // A row with no id at all can't be told from the day's other games, so the
-      // date is as far apart as those can be pulled.
-      const gameId = row.id ?? row.date;
-      const key = `${gameId}#${row.type}`;
+  for (const entries of Object.values(grouped ?? {})) {
+    for (const entry of entries ?? []) {
+      // An entry with no id at all can't be told from the day's other games, so
+      // the date is as far apart as those can be pulled.
+      const gameId = entry.id ?? entry.date;
+      const key = `${gameId}#${entry.type}`;
 
-      if (!byGame.has(key)) {
-        byGame.set(key, { gameId, type: row.type, rows: [] });
+      if (Array.isArray(entry.players)) {
+        byGame.set(key, { gameId, type: entry.type, source: entry });
+        continue;
       }
-      byGame.get(key).rows.push(row);
+
+      const held = byGame.get(key);
+
+      /* A game already held as a document is the whole of itself. Rows for that
+         same game are leftovers of the shape it was written in before, and
+         folding them in would have the game hold its scores twice. */
+      if (held && Array.isArray(held.source.players)) {
+        continue;
+      }
+
+      if (!held) {
+        byGame.set(key, { gameId, type: entry.type, source: { rows: [] } });
+      }
+      byGame.get(key).source.rows.push(entry);
     }
   }
 
   const games = [...byGame.values()]
-    .map(({ gameId, type, rows }) => buildGame(gameId, type, rows));
+    .map(({ gameId, type, source }) => buildGame(gameId, type, source));
 
   return sortGames(games, 'date-desc');
 }

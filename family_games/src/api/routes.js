@@ -16,7 +16,7 @@ export const routes = {
      or a method of its own, so it needs nothing of the gateway that isn't already
      allowed - a query string takes no part in a preflight, and the handler answers
      OPTIONS before it reads one. */
-  scores: (replace = false) => (replace ? '/games?replace=1' : '/games'),
+  scores: () => '/games',
   // Same path as scores() — the handler dispatches on the method, so the history
   // is a GET of the collection the games are POSTed to. Both params are required
   // by the handler, which answers 400 without them.
@@ -120,26 +120,23 @@ export function buildScoreRows(familyName, gameType, scoreData, gameId, date = t
    game be opened back up and written back over itself - see helpers/editGame.js.
    They default to a game being played now, so an ordinary submit says neither.
 
-   `replace` asks the writer to clear away the rows this game used to have and no
-   longer does. Off by default, and deliberately so: the id counts up per browser,
-   so two devices scoring the same family on the same day both start at one, and a
-   submit that replaced rather than merged would have the second delete the first's
-   game outright instead of muddling it. An edit knows it is writing back over a
-   game it just read, so an edit is where it is on. */
+   Nothing has to ask to replace what was there before. A game is stored as one
+   item now, so the write is the whole game and putting it puts everything about
+   it — an edit, a re-submit and a first submit are the same single write, and
+   there is no half of an older game left standing beside the new one. */
 export async function submitScores(
   familyName,
   gameType,
   scoreData,
   gameId,
-  { date = today(), replace = false } = {}
+  { date = today() } = {}
 ) {
   const rows = buildScoreRows(familyName, gameType, scoreData, gameId, date);
   if (rows.length === 0) {
     throw new Error('No scores to submit');
   }
 
-  const res = await fetch(apiUrl(routes.scores(replace)), {
-    method: 'POST',
+  const res = await fetch(apiUrl(routes.scores()), {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(rows),
   });

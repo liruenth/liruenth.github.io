@@ -102,7 +102,6 @@ function ScoreSheet() {
     if (editing) {
       await submitScores(familyName, gameType, scores, editing.number, {
         date: editing.date,
-        replace: true,
       });
       return;
     }
