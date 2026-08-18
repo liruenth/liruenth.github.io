@@ -29,8 +29,15 @@ const CORS_HEADERS = {
    A game is one item.
 
    It used to be one item per player per round, keyed `id` / `player_round`. It
-   is now one item per game, keyed `id` / `type`, holding an ordered list of
-   players and what each of them scored in each round.
+   is now one item per game, holding an ordered list of players and what each of
+   them scored in each round.
+
+   The keys are the same two attributes they always were, because a table's key
+   schema cannot be changed once the table is made — there is no altering it in
+   place and no adding to it, only building another table. So `player_round`
+   keeps its name and holds the game's type, and `date_round` keeps its name and
+   holds the game's number within its day. Both read as misnomers now; both are
+   what makes this a change of contents rather than a rebuild.
 
    Nothing ever read a game a round at a time — the only query asks for a
    family's games of one type and the app folds the rows straight back into a
@@ -137,6 +144,12 @@ function buildGames(rows) {
         // key change contents without rebuilding the index, whose key schema
         // cannot be altered in place.
         date_round: `${date}#${paddedNumber(row.id)}`,
+        // The table's own sort key, and a table's key schema cannot be changed
+        // after it is made — so the attribute keeps its name and holds the type
+        // instead, the same bargain date_round above strikes. A legacy row's
+        // always has a # in it and a game's never does, which is what keeps the
+        // two from ever landing on each other.
+        player_round: type,
         players: []
       });
     }
@@ -254,9 +267,10 @@ async function legacyKeys(games) {
       }));
 
       for (const item of response.Items || []) {
-        // The item just written has no player_round; only the rows it replaces
-        // do, which is what picks them out of everything under this id.
-        if (item.player_round && item.type === game.type) {
+        // A legacy row is the one with a # in its sort key. The item just written
+        // carries its type there instead, so without that test this would delete
+        // the very game it has this moment put.
+        if (item.player_round?.includes("#") && item.type === game.type) {
           keys.push({ id: item.id, player_round: item.player_round });
         }
       }
@@ -368,6 +382,7 @@ function collapseStored(rows) {
     family: first.family,
     family_type: first.family_type,
     date_round: `${first.date}#${paddedNumber(counterOf(first.id))}`,
+    player_round: first.type,
     players: []
   };
 

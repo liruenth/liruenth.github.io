@@ -19,14 +19,18 @@ the game that was stored, and the only way to be sure of that is for the backfil
 and the read to be the same code — see collapseLegacy in src/api/lambda.js, and
 in particular what it says about the order rows have to be put back into.
 */
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient, DescribeTableCommand } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, ScanCommand, BatchWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { fromIni } from '@aws-sdk/credential-providers';
 import { collapseLegacy } from './src/api/lambda.js';
 
 const TABLE_NAME = 'GameData';
 const REGION = 'us-west-1';
-const PROFILE = process.env.AWS_PROFILE || 'Connection 1';
+/* Not "Connection 1", which is the profile import-csv.js names in the line it
+   has commented out: the SDK cannot resolve a profile whose name has a space in
+   it, and answers that it has no credentials rather than that it cannot read the
+   name. Override with AWS_PROFILE if this should be run as somebody else. */
+const PROFILE = process.env.AWS_PROFILE || 'default';
 
 const MAX_BATCH = 25;
 const MAX_WRITE_ATTEMPTS = 5;
@@ -39,10 +43,22 @@ const commit = process.argv.includes('--commit');
 const limitArg = process.argv.find((arg) => arg.startsWith('--limit='));
 const limit = limitArg ? Number(limitArg.slice('--limit='.length)) : Infinity;
 
-const docClient = DynamoDBDocumentClient.from(new DynamoDBClient({
+const base = new DynamoDBClient({
   region: REGION,
   credentials: fromIni({ profile: PROFILE })
-}));
+});
+const docClient = DynamoDBDocumentClient.from(base);
+
+/* The table's own key, asked for rather than taken on trust.
+
+   A key schema cannot be changed once a table is made, so an item that does not
+   carry both key attributes is refused outright — and BatchWrite refuses the
+   whole batch for it, with a message that names neither the attribute nor the
+   item. Asking first is what turns that into a sentence saying which. */
+async function keyAttributes() {
+  const { Table } = await base.send(new DescribeTableCommand({ TableName: TABLE_NAME }));
+  return Table.KeySchema.map((part) => part.AttributeName);
+}
 
 const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
@@ -84,6 +100,19 @@ function cellKey(player, round, score, bid, took) {
    evidence of. */
 function verify(game, rows) {
   const problems = [];
+
+  /* Counted as well as compared. Two rows can hold the same player and round and
+     still both exist, because the key is player_round and theirs differ — and the
+     app has always folded such a pair down to one cell, last of them in index
+     order winning. So the item is right to hold one, but the count is the only
+     sign the pair was ever there, and a set on both sides would hide it. The one
+     that loses was invisible before this ran and is gone after it, which is worth
+     saying out loud rather than discovering from an item count. */
+  const shadowed = rows.length - game.players.reduce(
+    (total, entry) => total + Object.keys(entry.rounds).length, 0);
+  if (shadowed > 0) {
+    problems.push(`NOTE ${shadowed} of ${rows.length} rows repeat a player and round another row already holds; the app was already showing one of each pair`);
+  }
 
   const rowCells = new Set(rows.map((row) =>
     cellKey(row.player, row.round, row.score, row.bid, row.took)));
@@ -197,6 +226,7 @@ async function backfill() {
   const puts = [];
   const deletes = [];
   const skipped = [];
+  const notes = [];
   let collapsed = 0;
   let alreadyDone = 0;
   let beforeBytes = 0;
@@ -221,11 +251,15 @@ async function backfill() {
     const game = collapseLegacy(rows)[0];
     const problems = verify(game, rows);
 
-    if (problems.length) {
+    // A NOTE is a thing to know, not a reason to leave the game alone.
+    const blocking = problems.filter((problem) => !problem.startsWith("NOTE"));
+
+    if (blocking.length) {
       skipped.push({ key, problems });
       continue;
     }
 
+    notes.push(...problems.map((problem) => `${key}: ${problem}`));
     puts.push(game);
     deletes.push(...keys);
     collapsed += 1;
@@ -233,7 +267,18 @@ async function backfill() {
     afterBytes += JSON.stringify(game).length;
   }
 
-  return { items, legacy, typeless, byGame, puts, deletes, skipped, collapsed, alreadyDone, beforeBytes, afterBytes };
+  /* Checked against the table rather than against what this script believes the
+     table to be. Getting this wrong is not a wrong game, it is every game
+     refused at once — and nothing here would have told you which attribute. */
+  const required = await keyAttributes();
+  const keyProblems = puts.flatMap((game) => required
+    .filter((attribute) => game[attribute] === undefined)
+    .map((attribute) => `${game.id}#${game.type} carries no ${attribute}`));
+
+  return {
+    items, legacy, typeless, byGame, puts, deletes, skipped, notes,
+    collapsed, alreadyDone, beforeBytes, afterBytes, required, keyProblems
+  };
 }
 
 const plan = await backfill();
@@ -268,6 +313,22 @@ if (plan.skipped.length) {
 if (plan.puts.length) {
   console.log('\n  A sample of what would be written:');
   console.log(JSON.stringify(plan.puts[0], null, 2).split('\n').map((line) => `    ${line}`).join('\n'));
+}
+
+if (plan.notes.length) {
+  console.log("");
+  for (const note of plan.notes) {
+    console.log(`  ${note}`);
+  }
+}
+
+if (plan.keyProblems.length) {
+  console.error(`\n  The table is keyed on ${plan.required.join(' / ')}, and these items do not carry it:`);
+  for (const problem of plan.keyProblems.slice(0, 10)) {
+    console.error(`    ${problem}`);
+  }
+  console.error('\n  Writing would be refused a whole batch at a time. Nothing done.');
+  process.exit(1);
 }
 
 if (!commit) {
