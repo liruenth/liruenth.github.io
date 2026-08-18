@@ -1,12 +1,60 @@
-TODO
-Import games by 
-- updating google sheet with the data (ensure everything is uppercase)
-- download and replace test_game.csv
-- then run `node import-csv.js`
+# Family Games
 
+Score sheets for Contract Rummy and Mormon Bridge, plus a stats page over the
+games that have been submitted. React + Vite on GitHub Pages; the API is a Lambda
+(`src/api/lambda.js`) in front of a DynamoDB table.
 
+One game is one item in that table, keyed on `id` and `player_round`. Both key
+attributes are misnomers kept for their names' sake — a table's key schema can't
+be changed after it's created — so `id` holds `FAMILY#date_number` and
+`player_round` holds the game's type. See the comment at the top of
+`src/api/lambda.js`.
 
-run test server with `npm run dev`
+## Development
+
+```
+npm run dev
+```
+
+## Deploying
+
+The site is served from the committed `dist/`, so pushing source alone changes
+nothing on the live page:
+
+```
+npm run build
+git add -A family_games/dist   # -A so the previous hashed asset is dropped
+```
+
+`src/api/lambda.js` is deployed separately and by hand to the Lambda behind
+`API_BASE_URL` in `src/api/routes.js`.
+
+## Importing games from a spreadsheet
+
+1. Put the games in the sheet, one row per player per round.
+2. Export as CSV and replace `test_game.csv`.
+3. `node import-csv.js`
+
+Columns used: `id`, `date`, `type`, `family`, `player`, `round`, `score`. Include
+`date_round` and `player_round` if the sheet has them; they're used only to order
+the rows, which matters for the reason below.
+
+- **Dates must be `YYYY-MM-DD`.** Anything else is stored verbatim and then sorts
+  and filters wrongly for good, because dates are compared as strings.
+- **`id` is the game's number within its day.** Either `4` or `2026-08-17_4`
+  works — the importer takes whatever follows the last `_`.
+- **Casing doesn't matter.** Family, player, round and type are uppercased on the
+  way in, so `cami` and `CAMI` are the same player and would merge.
+- **An import overwrites** any game already filed under the same family, date,
+  number and type. Check that number is free for that family and day first.
+- **Mormon Bridge: row order is the seating.** There's no seat column, so players
+  are seated in the order the importer first meets them — sorted by `date_round`
+  then `player_round` where those columns exist, otherwise in CSV order.
+- It writes straight to DynamoDB and bypasses the Lambda, so none of the API's
+  row validation applies to it.
+
+Credentials come from `~/.aws/credentials`: the `default` profile, or whatever
+`AWS_PROFILE` names.
 
 # React + Vite
 
