@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom';
 import ContractRummy from './contract_rummy/ContractRummy';
 import MormonBridge from './mormon_bridge/MormonBridge';
 import StartNewGame from './common/StartNewGame';
+import EditingBanner from './common/EditingBanner';
 import { submitScores } from '../../api/routes';
 import {
   currentGameId,
@@ -10,43 +12,28 @@ import {
   markGameSubmitted
 } from '../../helpers/gameId';
 import { GROUPS_KEY } from '../../helpers/groups';
-
-/* A sheet is Maps inside Maps, which JSON has no notion of, so each one is
-   written out marked as what it is and read back by that mark.
-
-   Marked rather than guessed at: a Mormon Bridge round is an object of its own —
-   a bid, a took and a score — and a reviver that turned every object it met into
-   a Map would swallow it along with the two it's meant to catch. */
-const MAP_MARK = '__map';
-
-function mapReplacer(key, value) {
-  return value instanceof Map ? { [MAP_MARK]: [...value] } : value;
-}
-
-function mapReviver(key, value) {
-  return value && Array.isArray(value[MAP_MARK]) ? new Map(value[MAP_MARK]) : value;
-}
-
-/* A sheet saved before the marks above were written is unreadable now. There's
-   nothing to migrate — it's a game in progress, not history, and history lives in
-   DynamoDB — so it's dropped and the sheet starts over rather than restoring
-   something it can't use. */
-function restoreScoreData() {
-  const saved = localStorage.getItem('scoreData');
-  if (!saved) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(saved, mapReviver);
-    return parsed instanceof Map ? parsed : null;
-  } catch {
-    return null;
-  }
-}
+import { saveSheet, restoreSheet, clearSheet } from '../../helpers/sheetStorage';
+import { editingGame, stopEditing, finishEditing } from '../../helpers/editGame';
 
 function ScoreSheet() {
-  const [scoreData, setScoreData] = useState(restoreScoreData);
+  const navigate = useNavigate();
+  const [scoreData, setScoreData] = useState(restoreSheet);
+
+  /* Whether what's on the sheet is a finished game opened back up — and if it is,
+     the id and date it has to be written back under. Handed over by the stats page
+     through storage, so a refresh mid-edit is still an edit.
+
+     Only ever an edit of the sheet that's actually here. A session left behind
+     without one would otherwise be picked up by whatever game got started next,
+     and that game would be filed on top of the one this names. */
+  const [editing, setEditing] = useState(() => {
+    if (scoreData) {
+      return editingGame();
+    }
+
+    stopEditing();
+    return null;
+  });
   const [familyName, setFamilyName] = useState(() => {
     let savedFamilyName = localStorage.getItem('familyName');
     if (!!savedFamilyName) {
@@ -77,7 +64,7 @@ function ScoreSheet() {
   
   useEffect(() => {
     if (!!scoreData) {
-      localStorage.setItem('scoreData', JSON.stringify(scoreData, mapReplacer));
+      saveSheet(scoreData);
     }
   }, [scoreData]);
   
@@ -96,13 +83,39 @@ function ScoreSheet() {
     }
   }, [gameType]);
 
-  // Sends the finished game to DynamoDB. The sheet is passed in rather than read
-  // from state: the game holds the live copy, and ours only catches up once a
-  // cell edit pushes it back here. Errors are left to the caller to show — the
-  // rejection carries through, so a failed submit leaves the id unclaimed.
+  /* Sends the finished game to DynamoDB. The sheet is passed in rather than read
+     from state: the game holds the live copy, and ours only catches up once a
+     cell edit pushes it back here. Errors are left to the caller to show — the
+     rejection carries through, so a failed submit leaves the id unclaimed.
+
+     An edit goes back to where it came from: the id and date it was filed under
+     rather than the ones the day is counting, and replacing what is there rather
+     than only writing over the rows it happens to share — a round cleared on the
+     sheet has to be a round cleared in the history, or the two disagree.
+
+     The day's id isn't marked as used by an edit, because nothing has been filed
+     under it: marking it would have the next new game skip a number for a game
+     that was never played. */
   const submitGame = async (sheet) => {
-    await submitScores(familyName, gameType, sheet ?? scoreData, currentGameId());
+    const scores = sheet ?? scoreData;
+
+    if (editing) {
+      await submitScores(familyName, gameType, scores, editing.number, {
+        date: editing.date,
+        replace: true,
+      });
+      return;
+    }
+
+    await submitScores(familyName, gameType, scores, currentGameId());
     markGameSubmitted();
+  };
+
+  // The edit is filed. Clearing the desk here rather than leaving it is what makes
+  // the sheet open on a new game next time instead of on one already written back.
+  const finishEdit = () => {
+    finishEditing();
+    navigate('/stats');
   };
 
   // Back to choosing a game, with the family kept so the next sheet doesn't ask
@@ -117,7 +130,12 @@ function ScoreSheet() {
   // without being submitted leaves it free, so the next one takes it rather than
   // opening a gap in the day's numbering.
   const startNewGame = () => {
-    localStorage.removeItem('scoreData');
+    // Whatever was open stops being an edit of anything: what follows is a game of
+    // its own and is filed under the day's own id.
+    stopEditing();
+    setEditing(null);
+
+    clearSheet();
     localStorage.removeItem('gameType');
     localStorage.removeItem(GROUPS_KEY);
 
@@ -133,6 +151,12 @@ function ScoreSheet() {
    return (
 
     <>
+    {/* Ahead of the sheet rather than inside either game's own screen: what it
+        says is true of both, and the grid measures where it starts on the first
+        render either way. */}
+    {editing && players.length > 0 &&
+      <EditingBanner game={editing} familyName={familyName} onChangeFamily={setFamilyName}/>
+    }
     {
       !gameType ?
         <section id="center">
@@ -157,8 +181,8 @@ function ScoreSheet() {
       : players.length === 0 ?
         <StartNewGame gameType={gameType} familyName={familyName} setFamilyName={setFamilyName} onConfirm={setPlayers}/>
       : gameType === "CR" ?
-        <ContractRummy players={players} scoreData={scoreData} setScoreData={setScoreData} onSubmitGame={submitGame} onNewGame={startNewGame}/>
-      : <MormonBridge players={players} scoreData={scoreData} setScoreData={setScoreData} onSubmitGame={submitGame} onNewGame={startNewGame}/>
+        <ContractRummy players={players} scoreData={scoreData} setScoreData={setScoreData} onSubmitGame={submitGame} onSubmitted={editing ? finishEdit : undefined} onNewGame={startNewGame}/>
+      : <MormonBridge players={players} scoreData={scoreData} setScoreData={setScoreData} onSubmitGame={submitGame} onSubmitted={editing ? finishEdit : undefined} onNewGame={startNewGame}/>
     }
     </>
   )

@@ -106,11 +106,11 @@ function rowError(row, index) {
   return null;
 }
 
-async function writeRows(items) {
-  for (let start = 0; start < items.length; start += MAX_BATCH) {
-    let requests = items
-      .slice(start, start + MAX_BATCH)
-      .map((Item) => ({ PutRequest: { Item } }));
+// Takes made-up requests rather than items, so the same chunking and the same
+// retry serve the writing and the clearing away below it.
+async function writeRequests(all) {
+  for (let start = 0; start < all.length; start += MAX_BATCH) {
+    let requests = all.slice(start, start + MAX_BATCH);
 
     for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS && requests.length; attempt += 1) {
       let result;
@@ -120,9 +120,12 @@ async function writeRows(items) {
         }));
       } catch (error) {
         // A key mismatch names neither the attribute nor the item, so log one
-        // rejected item next to it — that's what tells us which key is wrong.
+        // rejected request next to it — that's what tells us which key is wrong.
+        // Either kind: a batch of deletes carries keys and no items at all.
         console.error("BatchWrite failed:", error.name, error.message);
-        console.error("Sample item:", JSON.stringify(requests[0].PutRequest.Item));
+        console.error("Sample request:", JSON.stringify(
+          requests[0].PutRequest?.Item ?? requests[0].DeleteRequest?.Key
+        ));
         throw error;
       }
 
@@ -133,6 +136,74 @@ async function writeRows(items) {
       throw new Error(`${requests.length} rows could not be written after ${MAX_WRITE_ATTEMPTS} attempts`);
     }
   }
+}
+
+/* Everything already filed under the ids a submit covers.
+
+   Read from the table itself rather than through the family index every other
+   read here uses, for two reasons. The index is partitioned on family, and a game
+   being re-filed under a new one has to be found under the old one it is leaving
+   — asking the index would ask for the family the rows are not under yet and find
+   nothing. And only the table can be read consistently: two submits of the same
+   game in quick succession would otherwise let the second miss what the first had
+   just written, and leave those rows behind.
+
+   Paged, like the roster read below it. A game is a couple of hundred rows at the
+   outside, well inside what one answer holds, but the id is a partition and
+   nothing here bounds how much ends up in it. */
+async function existingItems(ids) {
+  const items = [];
+
+  for (const id of ids) {
+    let startKey;
+
+    do {
+      const response = await docClient.send(new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: "#id = :id",
+        ExpressionAttributeValues: { ":id": id },
+        // The key to delete by, plus the type — which is what tells this game
+        // apart from the other one that can be filed under the same id.
+        ProjectionExpression: "#id, player_round, #type",
+        ExpressionAttributeNames: { "#id": "id", "#type": "type" },
+        ConsistentRead: true,
+        ExclusiveStartKey: startKey
+      }));
+
+      items.push(...(response.Items || []));
+      startKey = response.LastEvaluatedKey;
+    } while (startKey);
+  }
+
+  return items;
+}
+
+/* The rows this game used to have and does not any more: a round that has been
+   cleared, a player whose scores have all been rubbed out. A write on its own
+   cannot say any of that — it puts the rows there are and leaves the rest where
+   they were, so the history would go on showing a round the sheet no longer has.
+
+   Held to the type being written, and only to the type. Two games can share an id
+   — it is the date and a counter within it, and the type is not in it — so without
+   that a Contract Rummy submit would clear away the Mormon Bridge game filed
+   beside it. Not held to the family, because the family is the one thing an edit
+   is allowed to change: it is not part of the key, so re-filing a game is the
+   write itself moving the rows, and matching on it would look for them where they
+   have already gone.
+
+   A row that never carried a type matches nothing and is left alone, which is the
+   right way round to be wrong about it. */
+async function staleKeys(items) {
+  const ids = [...new Set(items.map((item) => item.id))];
+  const typeOf = new Map(items.map((item) => [item.id, item.type]));
+  const written = new Set(items.map((item) => `${item.id}#${item.player_round}`));
+
+  const existing = await existingItems(ids);
+
+  return existing
+    .filter((item) => item.type === typeOf.get(item.id))
+    .filter((item) => !written.has(`${item.id}#${item.player_round}`))
+    .map((item) => ({ id: item.id, player_round: item.player_round }));
 }
 
 // Takes the array of rows built by submitScores in routes.js
@@ -171,13 +242,34 @@ async function saveGame(event) {
   }
 
   const items = rows.map(buildItem);
-  await writeRows(items);
+
+  /* Asked for on the request rather than always done. A submit that replaces is
+     a submit that can delete, and the id counts up per browser: two devices
+     scoring the same family on the same day both start at one, so replacing by
+     default would have the second delete the first's game rather than muddle it.
+     An edit knows it is writing back over a game it just read, and says so. */
+  const replace = (event.queryStringParameters || {}).replace === "1";
+  const stale = replace ? await staleKeys(items) : [];
+
+  /* Written first, cleared away second, in batches of their own. The two sets
+     cannot overlap — stale is what is not being written — so nothing is put and
+     taken away in the same breath, which a batch would refuse anyway.
+
+     It is also the order to fail in. A game runs past what a transaction can
+     hold, so there is no all-or-nothing to be had: clearing away first and then
+     failing leaves rows gone with nothing put back, while writing first and then
+     failing leaves the new game standing with some of the old beside it — which
+     is what submitting again puts right. */
+  await writeRequests(items.map((Item) => ({ PutRequest: { Item } })));
+  await writeRequests(stale.map((Key) => ({ DeleteRequest: { Key } })));
 
   return {
     statusCode: 200,
     headers: { "Content-Type": "application/json", ...CORS_HEADERS },
     body: JSON.stringify({
       written: items.length,
+      // The only sign from out here that clearing away did what was meant by it
+      deleted: stale.length,
       gameIds: [...new Set(items.map((item) => item.id))]
     })
   };

@@ -5,14 +5,19 @@
 - filter and order the stack from the header, or switch to per-player totals
 */
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import './Stats.css'
 import FamilyNamePrompt from './FamilyNamePrompt'
 import StatsHeader from './StatsHeader'
 import GameTable from './GameTable'
 import PlayerTotals from './PlayerTotals'
+import ConfirmModal from '../score_sheets/common/ConfirmModal'
 import { fetchFamilyGames } from '../../api/routes'
+import { restoreSheet } from '../../helpers/sheetStorage'
+import { startEditing, editingGame } from '../../helpers/editGame'
 import {
   toGames,
+  canEdit,
   allPlayers,
   applyFilters,
   sortGames,
@@ -27,6 +32,7 @@ import {
 const FAMILY_KEY = 'familyName';
 
 function Stats() {
+  const navigate = useNavigate();
   const [familyName, setFamilyName] = useState('');
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -34,6 +40,9 @@ function Stats() {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [sort, setSort] = useState(DEFAULT_SORT);
   const [view, setView] = useState('games');
+  // The game waiting on the reader saying the sheet can be cleared, or null when
+  // there was nothing on it to ask about
+  const [replacing, setReplacing] = useState(null);
 
   const resetFilters = () => {
     setFilters(EMPTY_FILTERS);
@@ -58,6 +67,28 @@ function Stats() {
     } finally {
       setLoading(false);
     }
+  };
+
+  /* Opens a finished game on the score sheet. The sheet holds one game at a time,
+     so a game already on it has to go — which is worth asking about first, since
+     an unfinished game isn't anywhere else. Asked only when there's something
+     readable there: a sheet saved before the current format can't be restored
+     either way, so offering to discard it would be offering to discard nothing.
+
+     Everything the handoff writes is written by startEditing, so this is only the
+     asking and the going. */
+  const editGame = (game) => {
+    if (restoreSheet()) {
+      setReplacing(game);
+      return;
+    }
+
+    openForEditing(game);
+  };
+
+  const openForEditing = (game) => {
+    startEditing(game, familyName);
+    navigate('/score-sheet');
   };
 
   const changeFamily = () => {
@@ -111,12 +142,32 @@ function Stats() {
         view === 'games'
           ? (
             <div className="game-list">
-              {visible.map((game) => <GameTable key={game.key} game={game} />)}
+              {/* A game the sheet couldn't write back is shown without the way in,
+                  rather than with one that would file it somewhere else */}
+              {visible.map((game) => (
+                <GameTable
+                  key={game.key}
+                  game={game}
+                  onEdit={canEdit(game) ? editGame : undefined}
+                />
+              ))}
             </div>
           )
           // Built here rather than beside `visible`, so the stack of games isn't
           // walked round by round for a table it isn't showing.
           : <PlayerTotals boards={playerBoards(visible)} />
+      )}
+
+      {replacing && (
+        <ConfirmModal
+          heading="Discard Current Sheet"
+          message={editingGame()
+            ? 'The edit already open on the score sheet has not been submitted. Opening this game will discard it.'
+            : 'There is a game in progress on the score sheet. Opening this game will discard it.'}
+          confirmLabel="Discard and Edit"
+          onConfirm={() => openForEditing(replacing)}
+          onClose={() => setReplacing(null)}
+        />
       )}
     </section>
   )

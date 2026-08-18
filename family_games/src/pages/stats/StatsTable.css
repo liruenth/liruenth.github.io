@@ -23,6 +23,52 @@ light mode.
   margin-bottom: 16px;
 }
 
+/* The way into a game, shown when the card is pointed at.
+
+   Faded rather than taken out of the flow. Hidden with display or visibility it
+   couldn't be focused, so :focus-within below could never bring it back and there
+   would be no way to reach it from the keyboard at all. Fading also leaves it
+   holding its place: the heading is a centred flex row, and a button that only
+   took up room on hover would shove the date sideways every time the pointer
+   crossed the card.
+
+   A pointer that can't hover has no way to ask for it, so there it stays out. */
+.game-block .game-edit {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  color: var(--text-h);
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms;
+  /* Baseline alignment is what the rest of the row is laid out on, and an svg has
+     none of its own worth using - this keeps the pencil level with the date. */
+  align-self: center;
+}
+
+.game-block:hover .game-edit,
+.game-block:focus-within .game-edit {
+  opacity: 1;
+}
+
+.game-block .game-edit:hover {
+  color: var(--accent);
+}
+
+.game-block .game-edit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+@media (hover: none) {
+  .game-block .game-edit {
+    opacity: 1;
+  }
+}
+
 .game-type {
   font-size: 15px;
   font-weight: 400;

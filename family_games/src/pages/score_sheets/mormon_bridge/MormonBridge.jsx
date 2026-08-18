@@ -5,16 +5,13 @@ import ActionsMenu from '../common/ActionsMenu'
 import ConfirmModal from '../common/ConfirmModal'
 import RemovePlayerModal from '../common/RemovePlayerModal'
 import SubmitGame from '../common/SubmitGame'
-import { useRemovedPlayers } from '../common/removedPlayers'
+import { useRemovedPlayers, MB_REMOVED_KEY } from '../common/removedPlayers'
 import { emptySheet } from '../../../helpers/mormonBridge'
 import { roundsFor } from '../../../helpers/gameTypes'
 
 const cols = roundsFor('MB');
 
-// This sheet's own key for who's out of play — see common/removedPlayers.js
-const REMOVED_KEY = 'mbRemovedPlayers';
-
-function MormonBridge({players, scoreData, setScoreData, onSubmitGame, onNewGame}) {
+function MormonBridge({players, scoreData, setScoreData, onSubmitGame, onSubmitted, onNewGame}) {
   /* Built once per game so entered scores survive re-renders. A restored sheet
      brings its own scores; a new game starts every round of every player blank.
 
@@ -24,7 +21,7 @@ function MormonBridge({players, scoreData, setScoreData, onSubmitGame, onNewGame
      reorders it: the order the players were entered in is the order they're
      sitting in, and that's what the bidding follows. */
   const [scores, setScores] = useState(() => scoreData ?? emptySheet(players));
-  const [removed, setRemoved, clearRemoved] = useRemovedPlayers(REMOVED_KEY);
+  const [removed, setRemoved, clearRemoved] = useRemovedPlayers(MB_REMOVED_KEY);
   const [autoStepping, setAutoStepping] = useState(false);
   const [removingPlayer, setRemovingPlayer] = useState(false);
   const [startingNewGame, setStartingNewGame] = useState(false);
@@ -67,7 +64,7 @@ function MormonBridge({players, scoreData, setScoreData, onSubmitGame, onNewGame
             >
               Remove Player{removed.size ? ` (${removed.size})` : ''}
             </button>
-            <SubmitGame scores={scores} onSubmit={onSubmitGame} onSelect={closeMenu}/>
+            <SubmitGame scores={scores} onSubmit={onSubmitGame} onSubmitted={onSubmitted} onSelect={closeMenu}/>
             <button
               type="button"
               className="actions-menu-item is-destructive"

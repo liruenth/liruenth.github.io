@@ -12,7 +12,11 @@ export const routes = {
   // reads below. The handler answers 400 without the family.
   familyPlayers: (familyName) =>
     `/players?${new URLSearchParams({ family: familyName })}`,
-  scores: () => '/games',
+  /* Same path either way. Replacing is a flag on the request rather than a route
+     or a method of its own, so it needs nothing of the gateway that isn't already
+     allowed - a query string takes no part in a preflight, and the handler answers
+     OPTIONS before it reads one. */
+  scores: (replace = false) => (replace ? '/games?replace=1' : '/games'),
   // Same path as scores() — the handler dispatches on the method, so the history
   // is a GET of the collection the games are POSTed to. Both params are required
   // by the handler, which answers 400 without them.
@@ -60,12 +64,11 @@ function enteredNumber(value) {
 
    Every row of a game carries the same gameId, so it doubles as the id of the
    game itself — the caller owns it and is what counts it on. */
-export function buildScoreRows(familyName, gameType, scoreData, gameId) {
+export function buildScoreRows(familyName, gameType, scoreData, gameId, date = today()) {
   if (!scoreData) {
     return [];
   }
 
-  const date = today();
   const rows = [];
   let seat = 0;
 
@@ -111,14 +114,31 @@ export function buildScoreRows(familyName, gameType, scoreData, gameId) {
   return rows;
 }
 
-// Sends a finished game to the Lambda that writes it to DynamoDB.
-export async function submitScores(familyName, gameType, scoreData, gameId) {
-  const rows = buildScoreRows(familyName, gameType, scoreData, gameId);
+/* Sends a finished game to the Lambda that writes it to DynamoDB.
+
+   The date and the id are the game's, not the day's, which is what lets a finished
+   game be opened back up and written back over itself - see helpers/editGame.js.
+   They default to a game being played now, so an ordinary submit says neither.
+
+   `replace` asks the writer to clear away the rows this game used to have and no
+   longer does. Off by default, and deliberately so: the id counts up per browser,
+   so two devices scoring the same family on the same day both start at one, and a
+   submit that replaced rather than merged would have the second delete the first's
+   game outright instead of muddling it. An edit knows it is writing back over a
+   game it just read, so an edit is where it is on. */
+export async function submitScores(
+  familyName,
+  gameType,
+  scoreData,
+  gameId,
+  { date = today(), replace = false } = {}
+) {
+  const rows = buildScoreRows(familyName, gameType, scoreData, gameId, date);
   if (rows.length === 0) {
     throw new Error('No scores to submit');
   }
 
-  const res = await fetch(apiUrl(routes.scores()), {
+  const res = await fetch(apiUrl(routes.scores(replace)), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(rows),

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import ConfirmModal from './ConfirmModal'
 
-function SubmitGame({ scores, onSubmit, onSelect }) {
+function SubmitGame({ scores, onSubmit, onSelect, onSubmitted }) {
   const [confirming, setConfirming] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -23,6 +23,16 @@ function SubmitGame({ scores, onSubmit, onSelect }) {
     }
 
     setSubmitting(false);
+  };
+
+  /* One way out of the receipt, wired to both of its exits. The modal is a
+     <dialog> opened with showModal, so Esc closes it through onClose alone and
+     never through the confirm - and an edit that told the page it was finished
+     from only one of the two would strand the reader on a sheet it had already
+     filed. */
+  const dismissReceipt = () => {
+    setShowingReceipt(false);
+    onSubmitted?.();
   };
 
   /* Submitting again is allowed: every row carries the game's id, so a second
@@ -52,8 +62,8 @@ function SubmitGame({ scores, onSubmit, onSelect }) {
           message="The game has been saved."
           confirmLabel="OK"
           showCancel={false}
-          onConfirm={() => setShowingReceipt(false)}
-          onClose={() => setShowingReceipt(false)}
+          onConfirm={dismissReceipt}
+          onClose={dismissReceipt}
         />
       }
       <button

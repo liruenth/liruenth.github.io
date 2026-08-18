@@ -126,6 +126,12 @@ function buildGame(gameId, type, rows) {
     gameId,
     gameNumber: counter === -1 ? null : gameId.slice(counter + 1),
     date: rows[0]?.date ?? (counter === -1 ? gameId : gameId.slice(0, counter)),
+    /* The other half of the id, kept apart from the date above. They say the same
+       thing today, but the date shown is the row's and this one is the key's, and
+       it is the key's that has to be sent back to file an edit under the game it
+       came from. Taking the shown one would land an edit on a different id and
+       leave the original behind. */
+    idDate: counter === -1 ? null : gameId.slice(0, counter),
     type,
     players,
     rounds,
@@ -134,6 +140,11 @@ function buildGame(gameId, type, rows) {
     ranked,
     // What the game's table puts its rows in, which isn't always the ranking
     order,
+    /* Seat order on its own, as well as inside `order` where the type asks for
+       it. An edit is written back with the seats worked out from the row order,
+       so a sheet opened in the ranking would file the ranking as the seating —
+       see helpers/editGame.js. */
+    seated,
     winners,
     playerCount: scores.size,
     lowestTotal,
@@ -174,6 +185,18 @@ export function toGames(grouped) {
     .map(({ gameId, type, rows }) => buildGame(gameId, type, rows));
 
   return sortGames(games, 'date-desc');
+}
+
+/* Whether a finished game can be opened on the sheet and written back.
+
+   Two things it needs. A counter, because the edit is filed under the id it came
+   from and an id that never carried one has no number to send back — it would be
+   written as a new game and leave the original where it was. And a type the sheet
+   knows, because the sheet falls through to Mormon Bridge for anything it doesn't
+   recognise, and a Mormon Bridge cell is an object where Contract Rummy's is a
+   number: the first keystroke would be written into a number and throw. */
+export function canEdit(game) {
+  return !!game.gameNumber && GAME_TYPE_IDS.includes(game.type);
 }
 
 // Every player who appears anywhere in the list, for the filter to offer.

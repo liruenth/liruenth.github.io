@@ -6,23 +6,20 @@ import ConfirmModal from '../common/ConfirmModal'
 import GroupsModal from '../common/GroupsModal'
 import RemovePlayerModal from '../common/RemovePlayerModal'
 import SubmitGame from '../common/SubmitGame'
-import { useRemovedPlayers } from '../common/removedPlayers'
+import { useRemovedPlayers, CR_REMOVED_KEY } from '../common/removedPlayers'
 import { lastCompleteCol, averageTotal, sortedByTotal } from '../../../helpers/scoring'
 import { readGroups, saveGroups } from '../../../helpers/groups'
 import { roundsFor } from '../../../helpers/gameTypes'
 
 const cols = roundsFor('CR');
 
-// This sheet's own key for who's out of play — see common/removedPlayers.js
-const REMOVED_KEY = 'crRemovedPlayers';
-
-function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGame}) {
+function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onSubmitted, onNewGame}) {
   // Built once per game so entered scores survive re-renders. A restored sheet
   // brings its own scores; a new game starts every player empty.
   const [scores, setScores] = useState(() => scoreData ??
     new Map(players.map(player => [player, new Map()]))
   );
-  const [removed, setRemoved, clearRemoved] = useRemovedPlayers(REMOVED_KEY);
+  const [removed, setRemoved, clearRemoved] = useRemovedPlayers(CR_REMOVED_KEY);
   const [addingPlayer, setAddingPlayer] = useState(false);
   const [changingGroups, setChangingGroups] = useState(false);
   const [removingPlayer, setRemovingPlayer] = useState(false);
@@ -134,7 +131,7 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onNewGam
             >
               Remove Player{removed.size ? ` (${removed.size})` : ''}
             </button>
-            <SubmitGame scores={scores} onSubmit={onSubmitGame} onSelect={closeMenu}/>
+            <SubmitGame scores={scores} onSubmit={onSubmitGame} onSubmitted={onSubmitted} onSelect={closeMenu}/>
             <button
               type="button"
               className="actions-menu-item is-destructive"

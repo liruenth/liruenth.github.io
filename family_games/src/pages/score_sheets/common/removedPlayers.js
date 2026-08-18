@@ -10,6 +10,14 @@
    mormon_bridge/MormonBridge.jsx. */
 import { useState, useEffect } from 'react'
 
+/* The keys themselves, named here rather than in the sheets that use them, so
+   anything clearing the desk between games can reach every one of them without
+   writing the names out a second time — see helpers/editGame.js, which clears
+   both on its way into and out of an edit. */
+export const CR_REMOVED_KEY = 'crRemovedPlayers';
+export const MB_REMOVED_KEY = 'mbRemovedPlayers';
+export const REMOVED_KEYS = [CR_REMOVED_KEY, MB_REMOVED_KEY];
+
 function readRemoved(storageKey) {
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
