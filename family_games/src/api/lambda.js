@@ -129,7 +129,14 @@ function buildGames(rows) {
     const date = upper(row.date);
     const type = upper(row.type);
     const family = upper(row.family_name);
-    const id = `${date}_${row.id}`;
+    /* The family, the day, and the game's number within that day. The family is
+       in here because without it the id says only "the first game of the 17th",
+       which two families scoring on one day both write — and a game is one item
+       now, so the second would replace the first rather than muddle into it.
+
+       `#` between the family and the rest, `_` before the number, so both halves
+       can be read back off it: the number is what follows the last `_`. */
+    const id = `${family}#${date}_${row.id}`;
     const key = `${id}#${type}`;
 
     if (!games.has(key)) {

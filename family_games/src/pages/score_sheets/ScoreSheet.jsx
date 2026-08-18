@@ -100,7 +100,7 @@ function ScoreSheet() {
     const scores = sheet ?? scoreData;
 
     if (editing) {
-      await submitScores(familyName, gameType, scores, editing.number, {
+      await submitScores(editing.family, gameType, scores, editing.number, {
         date: editing.date,
       });
       return;
@@ -154,7 +154,7 @@ function ScoreSheet() {
         says is true of both, and the grid measures where it starts on the first
         render either way. */}
     {editing && players.length > 0 &&
-      <EditingBanner game={editing} familyName={familyName} onChangeFamily={setFamilyName}/>
+      <EditingBanner game={editing}/>
     }
     {
       !gameType ?

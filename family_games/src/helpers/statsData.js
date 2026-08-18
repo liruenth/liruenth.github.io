@@ -135,11 +135,10 @@ function buildGame(gameId, type, game) {
     : players;
 
   const order = rowOrderFor(type) === 'seat' ? seated : ranked;
-
-  /* The id is unique per day, and a day's games are told apart by the counter the
-     id ends in — which is the number the game was known by while it was on. An id
-     that's only a date is one the rows never carried, so there's no number to show
-     and the heading says the day alone rather than inventing one. */
+  /* A day's games are told apart by the counter the id ends in — which is the
+     number the game was known by while it was on. An id with no counter is one
+     this app didn't write, so there's no number to show and the heading says the
+     day alone rather than inventing one. */
   const counter = gameId.lastIndexOf('_');
 
   return {
@@ -147,12 +146,10 @@ function buildGame(gameId, type, game) {
     gameId,
     gameNumber: counter === -1 ? null : gameId.slice(counter + 1),
     date: game.date ?? (counter === -1 ? gameId : gameId.slice(0, counter)),
-    /* The other half of the id, kept apart from the date above. They say the same
-       thing today, but the date shown is the row's and this one is the key's, and
-       it is the key's that has to be sent back to file an edit under the game it
-       came from. Taking the shown one would land an edit on a different id and
-       leave the original behind. */
-    idDate: counter === -1 ? null : gameId.slice(0, counter),
+    /* Whose game it is. The id is built from the family, the date and the number
+       together, so all three have to go back to file an edit under the game it
+       came from — and this is the one of them that isn't otherwise on the sheet. */
+    family: game.family ?? null,
     type,
     players,
     rounds,

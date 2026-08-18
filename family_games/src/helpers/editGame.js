@@ -29,9 +29,9 @@ export function editingGame() {
 
   try {
     const parsed = JSON.parse(saved);
-    // A session naming neither of the two things it exists to carry is no
-    // session — better dropped than used to file a game under `undefined`.
-    return parsed?.number && parsed?.date ? parsed : null;
+    // A session that doesn't name all three of the things the id is built from
+    // is no session — better dropped than used to file a game under `undefined`.
+    return parsed?.number && parsed?.date && parsed?.family ? parsed : null;
   } catch {
     return null;
   }
@@ -98,7 +98,7 @@ function rebuildSheet(game) {
    now rather than left for the next game to file itself on top of. Done here
    rather than when the edit finishes, so an edit that's abandoned still leaves the
    counter somewhere safe. */
-export function startEditing(game, familyName) {
+export function startEditing(game) {
   if (gameSubmitted()) {
     bumpGameId();
   }
@@ -111,17 +111,22 @@ export function startEditing(game, familyName) {
      the Contract Rummy sheet still: it re-ranks its rows only while it's split,
      and rows that moved would be written back as seats that moved. */
   saveGroups(1);
-  if (familyName) {
-    localStorage.setItem('familyName', familyName);
+  /* The game's own family, not whichever one the page happened to be showing.
+     The family is part of the id, so it is not a thing an edit gets to change —
+     changing it would file the game somewhere else and leave the original where
+     it was. */
+  if (game.family) {
+    localStorage.setItem('familyName', game.family);
   }
 
   saveSheet(rebuildSheet(game));
 
+  /* The three things the id is built from, so the edit is written back over the
+     game it came from rather than beside it. */
   localStorage.setItem(EDIT_KEY, JSON.stringify({
     number: game.gameNumber,
-    // The key's date, not the shown one — see idDate in statsData.js
-    date: game.idDate ?? game.date,
-    family: familyName,
+    date: game.date,
+    family: game.family,
   }));
 }
 

@@ -87,7 +87,7 @@ function Stats() {
   };
 
   const openForEditing = (game) => {
-    startEditing(game, familyName);
+    startEditing(game);
     navigate('/score-sheet');
   };
 
