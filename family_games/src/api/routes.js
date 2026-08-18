@@ -137,6 +137,7 @@ export async function submitScores(
   }
 
   const res = await fetch(apiUrl(routes.scores()), {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(rows),
   });
