@@ -46,10 +46,9 @@ const CORS_HEADERS = {
    games, and an edit that could not be atomic because a game ran past what one
    write could hold.
 
-   Both shapes are read for as long as the old rows are still in the table. A
-   legacy sort key always contains a `#` and a new one never does, so the two
-   cannot collide and no cutover is needed. Everything marked LEGACY below goes
-   once the table is backfilled.
+   The rows are gone: the table was backfilled and holds one item per game
+   throughout. What is left of the old shape is the two key attributes whose
+   names still describe it.
    --------------------------------------------------------------------------- */
 
 // Stored uppercase so a lookup doesn't have to know how a name was typed —
@@ -194,8 +193,8 @@ function rowError(row, index) {
   return null;
 }
 
-// Takes made-up requests rather than items, so the same chunking and the same
-// retry serve the writing and the clearing away below it.
+// Takes made-up requests rather than items, so a caller can put or delete
+// through the same chunking and the same retry.
 async function writeRequests(all) {
   for (let start = 0; start < all.length; start += MAX_BATCH) {
     let requests = all.slice(start, start + MAX_BATCH);
@@ -224,62 +223,6 @@ async function writeRequests(all) {
       throw new Error(`${requests.length} items could not be written after ${MAX_WRITE_ATTEMPTS} attempts`);
     }
   }
-}
-
-/* LEGACY. The rows a game used to be filed as, which the item now replacing it
-   does not overwrite: it is filed under a different sort key, so without this
-   the game would be answered for twice.
-
-   Read from the table itself rather than through the family index every other
-   read here uses, for two reasons. The index is partitioned on family, and a
-   game being re-filed under a new one has to be found under the old one it is
-   leaving — asking the index would ask for the family the rows are not under yet
-   and find nothing. And only the table can be read consistently: two submits of
-   the same game in quick succession would otherwise let the second miss what the
-   first had just written, and leave those rows behind.
-
-   Held to the type being written, and only to the type: two games can share an
-   id, so without that a Contract Rummy submit would clear away the Mormon Bridge
-   game filed beside it. Not held to the family, because the family is the one
-   thing an edit is allowed to change — it is not part of the key, so re-filing a
-   game is the write itself moving it, and matching on it would look for the rows
-   where they have already gone.
-
-   A row that never carried a type matches nothing and is left alone, which is
-   the right way round to be wrong about it. */
-async function legacyKeys(games) {
-  const keys = [];
-
-  for (const game of games) {
-    let startKey;
-
-    do {
-      const response = await docClient.send(new QueryCommand({
-        TableName: TABLE_NAME,
-        KeyConditionExpression: "#id = :id",
-        ExpressionAttributeValues: { ":id": game.id },
-        // The key to delete by, plus the type — which is what tells this game
-        // apart from the other one that can be filed under the same id.
-        ProjectionExpression: "#id, player_round, #type",
-        ExpressionAttributeNames: { "#id": "id", "#type": "type" },
-        ConsistentRead: true,
-        ExclusiveStartKey: startKey
-      }));
-
-      for (const item of response.Items || []) {
-        // A legacy row is the one with a # in its sort key. The item just written
-        // carries its type there instead, so without that test this would delete
-        // the very game it has this moment put.
-        if (item.player_round?.includes("#") && item.type === game.type) {
-          keys.push({ id: item.id, player_round: item.player_round });
-        }
-      }
-
-      startKey = response.LastEvaluatedKey;
-    } while (startKey);
-  }
-
-  return keys;
 }
 
 /* Takes the array of rows built by buildScoreRows in routes.js.
@@ -328,126 +271,21 @@ async function saveGame(event) {
   }
 
   const games = buildGames(rows);
-  const stale = await legacyKeys(games);
 
-  /* Written first, cleared away second. The two cannot overlap — stale is only
-     ever rows of the shape being replaced — so nothing is put and taken away in
-     the same breath, which a batch would refuse anyway.
-
-     It is also the order to fail in: clearing away first and then failing leaves
-     a game gone with nothing put back, while writing first and then failing
-     leaves the new item standing with some of the old rows beside it, which the
-     read below already knows to ignore and which submitting again puts right. */
+  /* One write, and a game is one item, so a submit is atomic in the only sense
+     that matters here: the game that was there is replaced by the game that was
+     sent, whole, or it is not touched at all. There is nothing left over to clear
+     away afterwards and no half-written game to put right by submitting again. */
   await writeRequests(games.map((Item) => ({ PutRequest: { Item } })));
-  await writeRequests(stale.map((Key) => ({ DeleteRequest: { Key } })));
 
   return {
     statusCode: 200,
     headers: { "Content-Type": "application/json", ...CORS_HEADERS },
     body: JSON.stringify({
       written: games.length,
-      // The only sign from out here that clearing away did what was meant by it
-      deleted: stale.length,
       gameIds: [...new Set(games.map((game) => game.id))]
     })
   };
-}
-
-/* The counter an id ends in — the game's number within its day. An id that
-   carries none is one this app didn't write. */
-function counterOf(id) {
-  const text = String(id ?? "");
-  const at = text.lastIndexOf("_");
-  return at === -1 ? "" : text.slice(at + 1);
-}
-
-/* LEGACY. A game still stored as rows, as the one item that replaces them.
-
-   Used on both sides of the migration: the read below answers with it so the app
-   is handed one shape whatever it finds, and the backfill stores it. That is why
-   it builds the sort key afresh from the id rather than carrying the rows' own
-   across — a row's is the round it holds, and the item's is the game's number
-   within its day.
-
-   The rows must already be in index order. That order is what stands in for the
-   seating where no seat was ever stored, and it is `date_round` that gives it —
-   not the order a Scan happens to answer in, which is by player. collapseLegacy
-   below is what guarantees it. */
-function collapseStored(rows) {
-  const first = rows[0];
-  const game = {
-    id: first.id,
-    type: first.type,
-    date: first.date,
-    family: first.family,
-    family_type: first.family_type,
-    date_round: `${first.date}#${paddedNumber(counterOf(first.id))}`,
-    player_round: first.type,
-    players: []
-  };
-
-  for (const row of rows) {
-    const entry = playerEntry(game, row.player);
-
-    /* Read the same way a submitted row's is, rather than with a bare Number:
-       a CSV hands every column over as a string, and an empty seat column would
-       otherwise become a seat of nought for everyone — which for Mormon Bridge
-       would be a seating invented out of nothing and stored as fact. */
-    const seat = optionalNumber(row.seat);
-
-    if (seat !== undefined && entry.seat === undefined) {
-      entry.seat = seat;
-    }
-
-    putCell(entry, row.round, row);
-  }
-
-  return game;
-}
-
-/* LEGACY. Loose rows into the games they belong to.
-
-   Grouped by id and type together, because the id does not carry the type and
-   two games can share one. Each game's rows are put into index order before they
-   are folded, back into the order the index would have answered in: by
-   date_round, and then by player_round, which is what DynamoDB breaks a tie on
-   because it is the table's own sort key. Reproducing both halves is the point —
-   sorted on date_round alone it would be right only by luck of the input already
-   being in player order, and a Scan answers in exactly that order while a CSV
-   answers in none. Get it wrong and a game with no seats stored comes back
-   re-ordered, which for Mormon Bridge is its seating rewritten. */
-function collapseLegacy(rows) {
-  const byGame = new Map();
-
-  for (const row of rows) {
-    const key = `${row.id}#${row.type}`;
-    if (!byGame.has(key)) {
-      byGame.set(key, []);
-    }
-    byGame.get(key).push(row);
-  }
-
-  return [...byGame.values()].map((group) => collapseStored(
-    [...group].sort((a, b) =>
-      String(a.date_round).localeCompare(String(b.date_round))
-      || String(a.player_round).localeCompare(String(b.player_round)))
-  ));
-}
-
-/* Whatever the query answered with, as games. An item carrying a player list is
-   already one; anything else is rows to be folded.
-
-   A game answered for as an item is the whole of itself, so rows found beside it
-   are leftovers a clearing away did not finish and are dropped rather than folded
-   — folded, the game would hold its scores twice. */
-function gamesFrom(items) {
-  const games = items.filter((item) => Array.isArray(item.players));
-  const answered = new Set(games.map((game) => `${game.id}#${game.type}`));
-
-  const leftover = items.filter((item) =>
-    !Array.isArray(item.players) && !answered.has(`${item.id}#${item.type}`));
-
-  return [...games, ...collapseLegacy(leftover)];
 }
 
 /* A family's games of one type, oldest first.
@@ -474,7 +312,7 @@ async function queryGames(familyName, type) {
     startKey = response.LastEvaluatedKey;
   } while (startKey);
 
-  return gamesFrom(items);
+  return items;
 }
 
 // Every player a family has ever had a game written for, deduped — the roster a
@@ -500,18 +338,15 @@ async function listPlayers(familyName) {
         KeyConditionExpression: "family_type = :target",
         ExpressionAttributeValues: { ":target": `${family}#${type}` },
         // The names and nothing else, so don't read the rest — it's what keeps
-        // the paging above rare. Both shapes are asked for: a game names its
-        // players together, a legacy row names the one it belongs to.
-        ProjectionExpression: "#player, #players",
-        ExpressionAttributeNames: { "#player": "player", "#players": "players" },
+        // the paging above rare. One game names all of its players at once.
+        ProjectionExpression: "#players",
+        ExpressionAttributeNames: { "#players": "players" },
         ExclusiveStartKey: startKey
       }));
 
       for (const item of response.Items || []) {
-        if (Array.isArray(item.players)) {
-          item.players.forEach((entry) => players.add(entry.player));
-        } else if (item.player) {
-          players.add(item.player);
+        for (const entry of item.players || []) {
+          players.add(entry.player);
         }
       }
 
@@ -566,10 +401,10 @@ function statsFor(games, type) {
   };
 }
 
-// Exported for the one-off scripts that write the same items this reads: they
-// must produce what the read above would, and sharing the fold is what makes
-// that so rather than something to keep in step by hand.
-export { buildGames, collapseStored, collapseLegacy };
+// Exported for import-csv.js, which turns a CSV into the same items a submit
+// writes. Sharing the one fold is what keeps a game imported and a game played
+// from being two different shapes.
+export { buildGames };
 
 export const handler = async (event) => {
   try {

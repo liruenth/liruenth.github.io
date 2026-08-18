@@ -3,7 +3,7 @@ import csv from 'csv-parser';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, BatchWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { fromIni } from '@aws-sdk/credential-providers';
-import { collapseLegacy } from './src/api/lambda.js';
+import { buildGames } from './src/api/lambda.js';
 
 /* Credentials come from ~/.aws/credentials, never from this file — a key written
    in here is a key one `git add -A` away from being in the history for good.
@@ -24,17 +24,18 @@ const docClient = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = 'GameData';
 const CSV_FILE_PATH = './test_game.csv'; // Path to your CSV file
 
-/* The CSV is in the shape the table used to hold: one row per player per round,
-   with the columns named as they were stored. A game is one item now, so the rows
-   are folded on the way in — by the same code the read path folds legacy rows
-   with, so that a game imported here and a game played in the app are the same
-   thing. See collapseLegacy in src/api/lambda.js, and in particular what it says
-   about the order rows have to be put back into: the CSV is in no order in
-   particular, and for a game with no seat column that order is its seating.
+/* The CSV holds the shape the table used to: one row per player per round, with
+   the columns named as they were stored. A game is one item now, so the rows are
+   turned into the rows a submit sends and handed to buildGames — the very code
+   the API writes a played game with. There is one fold in this codebase and this
+   is it, which is what stops an imported game and a played one drifting apart.
 
-   A row has to name the game it belongs to. Without an id or a type there is
-   nothing to group it under, and it would land in a partition nothing queries. */
-function usableRows(rows) {
+   Two things the CSV names differently, and one it doesn't name at all:
+   `player`/`family` are `player_name`/`family_name` on a submitted row, the `id`
+   column is the whole id where a submit sends only the counter within the day,
+   and there is no seat column — so the order the rows are folded in is the only
+   record of where anyone sat. */
+function submittedRows(rows) {
   const usable = rows.filter((row) => row.id && row.type);
   const dropped = rows.length - usable.length;
 
@@ -42,7 +43,24 @@ function usableRows(rows) {
     console.warn(`Skipped ${dropped} rows with no id or no type`);
   }
 
-  return usable;
+  /* Sorted into the order the index would have answered in — by date_round, then
+     by player_round, which is what DynamoDB breaks a tie on because it was the
+     table's own sort key. buildGames seats players in the order it meets them, so
+     for a CSV with no seat column this sort IS the seating. */
+  return [...usable]
+    .sort((a, b) =>
+      String(a.date_round).localeCompare(String(b.date_round))
+      || String(a.player_round).localeCompare(String(b.player_round)))
+    .map((row) => ({
+      // The counter within the day; buildGames rebuilds the id around the date.
+      id: String(row.id).slice(String(row.id).lastIndexOf('_') + 1),
+      date: row.date,
+      player_name: row.player,
+      family_name: row.family,
+      round: row.round,
+      score: row.score,
+      type: row.type,
+    }));
 }
 
 async function batchWrite(items) {
@@ -69,7 +87,7 @@ async function importCsv() {
       rows.push(row);
     })
     .on('end', async () => {
-      const games = collapseLegacy(usableRows(rows));
+      const games = buildGames(submittedRows(rows));
       console.log(`Parsed ${rows.length} rows into ${games.length} games. Uploading to ${TABLE_NAME}...`);
 
       for (let i = 0; i < games.length; i += 25) {

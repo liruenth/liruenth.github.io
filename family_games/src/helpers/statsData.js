@@ -43,46 +43,14 @@ function storedNumber(value) {
     : Number(value);
 }
 
-/* What a game is read out of, whichever shape it arrived in: what each player
-   scored in each round, where they sat, and the rounds the game actually touched.
-
-   Two shapes, because the store is being changed underneath this. A game used to
-   be one row per player per round and is becoming one document per game; both
-   fold to the same three collections, so everything downstream of the fold is
-   written once and neither shape is the special case. */
-function foldRows(rows, bidTook) {
-  const scores = new Map();
-  const seats = new Map();
-  const seenRounds = [];
-
-  for (const row of rows) {
-    if (!scores.has(row.player)) {
-      scores.set(row.player, new Map());
-    }
-    scores.get(row.player).set(row.round, bidTook
-      ? { bid: storedNumber(row.bid), took: storedNumber(row.took), score: Number(row.score) }
-      : Number(row.score));
-
-    // Every row of a player's carries the same seat, so the first one to name it
-    // has named it. A row written before seats were stored doesn't.
-    if (!seats.has(row.player) && storedNumber(row.seat) !== '') {
-      seats.set(row.player, Number(row.seat));
-    }
-
-    if (!seenRounds.includes(row.round)) {
-      seenRounds.push(row.round);
-    }
-  }
-
-  return { scores, seats, seenRounds };
-}
-
-/* The same three, from a game document.
+/* What a game is read out of: what each player scored in each round, where they
+   sat, and the rounds the game actually touched.
 
    `players` is a list rather than an object keyed by name so that its order
-   survives being stored: it is the order the rows used to arrive in, and a game
-   written before seats were stored has nothing else to say where its players
-   sat — which for Mormon Bridge is the order the bidding went round. */
+   survives being stored: it is the order the rows used to arrive in back when a
+   game was rows, and a game written before seats were stored has nothing else to
+   say where its players sat — which for Mormon Bridge is the order the bidding
+   went round. */
 function foldPlayers(players, bidTook) {
   const scores = new Map();
   const seats = new Map();
@@ -125,15 +93,13 @@ function foldPlayers(players, bidTook) {
    the score worked out from them — so a rebuilt game is the same shape the sheet
    works in either way, and totalled the way that sheet totals it.
 
-   `source` is either a game document or `{ rows }`; which one it is decides only
-   how the fold above reaches the scores. */
-function buildGame(gameId, type, source) {
+
+   `game` is the stored item: the game, with its players and their rounds. */
+function buildGame(gameId, type, game) {
   const bidTook = roundCellFor(type) === 'bid-took';
   const total = bidTook ? mbRowTotal : rowTotal;
 
-  const { scores, seats, seenRounds } = Array.isArray(source.players)
-    ? foldPlayers(source.players, bidTook)
-    : foldRows(source.rows, bidTook);
+  const { scores, seats, seenRounds } = foldPlayers(game.players, bidTook);
 
   const known = roundsFor(type);
   const rounds = [...known, ...seenRounds.filter((round) => !known.includes(round))];
@@ -180,7 +146,7 @@ function buildGame(gameId, type, source) {
     key: `${gameId}#${type}`,
     gameId,
     gameNumber: counter === -1 ? null : gameId.slice(counter + 1),
-    date: source.date ?? source.rows?.[0]?.date ?? (counter === -1 ? gameId : gameId.slice(0, counter)),
+    date: game.date ?? (counter === -1 ? gameId : gameId.slice(0, counter)),
     /* The other half of the id, kept apart from the date above. They say the same
        thing today, but the date shown is the row's and this one is the key's, and
        it is the key's that has to be sent back to file an edit under the game it
@@ -209,54 +175,40 @@ function buildGame(gameId, type, source) {
 
 /* The history into a flat list of games, newest first.
 
-   Grouped from what each entry carries rather than from the keys the response
-   arrived under. Every entry names its own game, and taking the id from the entry
-   is what makes this independent of how the endpoint chose to group — a handler
-   grouping on an attribute the entries don't carry answers one bucket called
-   "undefined", and the whole history would read as a single game.
+   Keyed from what each game carries rather than from the keys the response
+   arrived under. Every game names itself, and taking the id from the game is what
+   makes this independent of how the endpoint chose to group — a handler grouping
+   on an attribute the games don't carry answers one bucket called "undefined",
+   and the whole history would read as a single game.
 
-   Split by type as well as by id, because the id doesn't carry the type — it's
+   Keyed by type as well as by id, because the id doesn't carry the type — it's
    the date and a counter within it — so the same id can come back from two types
    and mean two different games. Left merged they'd share a table and the rounds
    of one would read as blanks in the other.
 
-   Both shapes the store answers in are accepted, since one is replacing the other
-   and a page load can land on either. A document is the whole of its game and
-   needs no gathering; the rows it is replacing have to be collected by the id and
-   type they each carry. */
+   Anything without a list of players is passed over rather than rendered as an
+   empty game. The store held one row per player per round until it was
+   backfilled, and the odd row that predates even that convention is still in
+   there — unreachable, since its family and type were never stored in the case
+   the query asks for, but better skipped here than trusted. */
 export function toGames(grouped) {
   const byGame = new Map();
 
-  for (const entries of Object.values(grouped ?? {})) {
-    for (const entry of entries ?? []) {
-      // An entry with no id at all can't be told from the day's other games, so
-      // the date is as far apart as those can be pulled.
-      const gameId = entry.id ?? entry.date;
-      const key = `${gameId}#${entry.type}`;
-
-      if (Array.isArray(entry.players)) {
-        byGame.set(key, { gameId, type: entry.type, source: entry });
+  for (const answered of Object.values(grouped ?? {})) {
+    for (const game of answered ?? []) {
+      if (!Array.isArray(game.players)) {
         continue;
       }
 
-      const held = byGame.get(key);
-
-      /* A game already held as a document is the whole of itself. Rows for that
-         same game are leftovers of the shape it was written in before, and
-         folding them in would have the game hold its scores twice. */
-      if (held && Array.isArray(held.source.players)) {
-        continue;
-      }
-
-      if (!held) {
-        byGame.set(key, { gameId, type: entry.type, source: { rows: [] } });
-      }
-      byGame.get(key).source.rows.push(entry);
+      // A game with no id at all can't be told from the day's others, so the
+      // date is as far apart as those can be pulled.
+      const gameId = game.id ?? game.date;
+      byGame.set(`${gameId}#${game.type}`, { gameId, type: game.type, game });
     }
   }
 
   const games = [...byGame.values()]
-    .map(({ gameId, type, source }) => buildGame(gameId, type, source));
+    .map(({ gameId, type, game }) => buildGame(gameId, type, game));
 
   return sortGames(games, 'date-desc');
 }
