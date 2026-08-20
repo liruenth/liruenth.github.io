@@ -30,11 +30,15 @@ const CSV_FILE_PATH = './test_game.csv'; // Path to your CSV file
    the API writes a played game with. There is one fold in this codebase and this
    is it, which is what stops an imported game and a played one drifting apart.
 
-   Two things the CSV names differently, and one it doesn't name at all:
-   `player`/`family` are `player_name`/`family_name` on a submitted row, the `id`
-   column is the whole id where a submit sends only the counter within the day,
-   and there is no seat column — so the order the rows are folded in is the only
-   record of where anyone sat. */
+   Two things the CSV names differently: `player`/`family` are
+   `player_name`/`family_name` on a submitted row, and the `id` column is the
+   whole id where a submit sends only the counter within the day.
+
+   `bid`, `took` and `seat` are optional, the same as they are on a played row —
+   Contract Rummy has none of them, and a sheet that predates them has none
+   either. Passed through where the CSV names them, left off where it doesn't: a
+   Mormon Bridge game without them imports as scores alone, with the bid and took
+   halves of every round blank. */
 function submittedRows(rows) {
   const usable = rows.filter((row) => row.id && row.type);
   const dropped = rows.length - usable.length;
@@ -43,24 +47,43 @@ function submittedRows(rows) {
     console.warn(`Skipped ${dropped} rows with no id or no type`);
   }
 
-  /* Sorted into the order the index would have answered in — by date_round, then
-     by player_round, which is what DynamoDB breaks a tie on because it was the
-     table's own sort key. buildGames seats players in the order it meets them, so
-     for a CSV with no seat column this sort IS the seating. */
+  /* Grouped by date and round the way the index would have answered — but no
+     further. Ordering within a round used to break the tie on `player_round`,
+     which sorted the players of a round alphabetically; buildGames seats them in
+     the order it meets them, so for a CSV with no seat column that sort WAS the
+     seating, and it filed every Mormon Bridge game as though the bidding went
+     round the table in alphabetical order.
+
+     Left to the CSV's own order instead, which the sort being stable preserves.
+     So the rows seat the players whether or not the sheet carries these columns,
+     and a `seat` column overrides even that — see below. */
   return [...usable]
-    .sort((a, b) =>
-      String(a.date_round).localeCompare(String(b.date_round))
-      || String(a.player_round).localeCompare(String(b.player_round)))
-    .map((row) => ({
-      // The counter within the day; buildGames rebuilds the id around the date.
-      id: String(row.id).slice(String(row.id).lastIndexOf('_') + 1),
-      date: row.date,
-      player_name: row.player,
-      family_name: row.family,
-      round: row.round,
-      score: row.score,
-      type: row.type,
-    }));
+    .sort((a, b) => String(a.date_round).localeCompare(String(b.date_round)))
+    .map((row) => {
+      const built = {
+        // The counter within the day; buildGames rebuilds the id around the date.
+        id: String(row.id).slice(String(row.id).lastIndexOf('_') + 1),
+        date: row.date,
+        player_name: row.player,
+        family_name: row.family,
+        round: row.round,
+        score: row.score,
+        type: row.type,
+      };
+
+      /* Only where the column is there and filled in, so a row comes out the same
+         shape a played one does. An empty cell is a column the sheet keeps for the
+         other game's sake, not a bid of nothing: buildGames would drop it either
+         way, but a blank is what the API rejects a row for, and this import is the
+         one path that doesn't go past that check. */
+      for (const field of ['bid', 'took', 'seat']) {
+        if (row[field] !== undefined && row[field] !== '') {
+          built[field] = row[field];
+        }
+      }
+
+      return built;
+    });
 }
 
 async function batchWrite(items) {

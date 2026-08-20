@@ -35,9 +35,10 @@ git add -A family_games/dist   # -A so the previous hashed asset is dropped
 2. Export as CSV and replace `test_game.csv`.
 3. `node import-csv.js`
 
-Columns used: `id`, `date`, `type`, `family`, `player`, `round`, `score`. Include
-`date_round` and `player_round` if the sheet has them; they're used only to order
-the rows, which matters for the reason below.
+Columns used: `id`, `date`, `type`, `family`, `player`, `round`, `score`, plus
+`bid` and `took` for Mormon Bridge and an optional `seat`. Leave a cell empty and
+the column is left off that row, so one sheet can carry both games. `date_round`
+orders the rows if the sheet has it; `player_round` and `family_type` are ignored.
 
 - **Dates must be `YYYY-MM-DD`.** Anything else is stored verbatim and then sorts
   and filters wrongly for good, because dates are compared as strings.
@@ -47,9 +48,13 @@ the rows, which matters for the reason below.
   way in, so `cami` and `CAMI` are the same player and would merge.
 - **An import overwrites** any game already filed under the same family, date,
   number and type. Check that number is free for that family and day first.
-- **Mormon Bridge: row order is the seating.** There's no seat column, so players
-  are seated in the order the importer first meets them — sorted by `date_round`
-  then `player_round` where those columns exist, otherwise in CSV order.
+- **Mormon Bridge: row order is the seating.** The rows are the bidding order, and
+  players are seated in the order the importer first meets them, so list them in
+  turn order starting with the first to bid. Give every row a `seat` instead — 0
+  for the first bidder — to say it outright rather than positionally.
+- **Mormon Bridge needs `bid` and `took`.** The score is stored rather than worked
+  out on read, so a sheet with only a `score` column imports and totals correctly
+  but leaves both top halves of every round blank on the stats page.
 - **Mormon Bridge rounds are `10` down to `1`, and a game that opened lower marks
   its repeats.** Ten cards each is more than the deck holds once six are playing,
   so a big table opens on nine or eight and plays that round again to keep the
