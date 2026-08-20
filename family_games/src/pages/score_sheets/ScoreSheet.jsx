@@ -12,6 +12,7 @@ import {
   markGameSubmitted
 } from '../../helpers/gameId';
 import { GROUPS_KEY } from '../../helpers/groups';
+import { STARTING_ROUND_KEY } from '../../helpers/startingRound';
 import { saveSheet, restoreSheet, clearSheet } from '../../helpers/sheetStorage';
 import { editingGame, stopEditing, finishEditing } from '../../helpers/editGame';
 
@@ -123,7 +124,9 @@ function ScoreSheet() {
   // removing it here. Players aren't stored under a key of their own; they're
   // read back off the sheet, so they're cleared with it. Groups are written by the
   // roster screen and by Contract Rummy but cleared here with everything else, so
-  // the next game doesn't inherit the last one's split.
+  // the next game doesn't inherit the last one's split — and the starting round
+  // goes the same way, so the next Mormon Bridge game opens on ten unless it's
+  // asked to open lower.
   //
   // The id is only counted on if something was filed under it. A game abandoned
   // without being submitted leaves it free, so the next one takes it rather than
@@ -137,6 +140,7 @@ function ScoreSheet() {
     clearSheet();
     localStorage.removeItem('gameType');
     localStorage.removeItem(GROUPS_KEY);
+    localStorage.removeItem(STARTING_ROUND_KEY);
 
     if (gameSubmitted()) {
       bumpGameId();

@@ -7,6 +7,9 @@ order what comes back.
 
 `rounds` is the sheet's column list, and is also what puts the stats page's
 columns in the order they were played rather than the order the API returns them.
+For Mormon Bridge it's the default rather than the whole story — one of its games
+can open on a lower round and repeat it, so its list is built per game from
+`startingRounds`. See the note on both fields below.
 
 `wins` is which end of the totals took it, and the games disagree — so it lives
 here with the game rather than being assumed wherever a winner gets worked out.
@@ -35,10 +38,21 @@ export const GAME_TYPES = [
   {
     id: 'MB',
     label: 'Mormon Bridge',
-    // Counts down, ten cards dealt to one. The round is also how many tricks are
-    // on the table, which is what the bonus for taking the lot is checked
-    // against — see helpers/mormonBridge.js.
+    /* Counts down, ten cards dealt to one. The default rather than the only
+       list: a table too big to be dealt ten cards each opens lower and repeats
+       its opening round to keep the game ten rounds long, so what a game is
+       actually played over is built by mbRounds in helpers/mormonBridge.js. This
+       is what that returns for a game opening on ten.
+
+       The round is also how many tricks are on the table, which is what the bonus
+       for taking the lot is checked against. A repeated round carries a mark
+       (`9+`, `8-`) that is no part of that count, so the count is read with
+       tricksIn rather than off the name as a number. */
     rounds: ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
+    // Which rounds a game can open on, highest — the ordinary game — first. Nine
+    // and eight are for a table the deck can't be dealt ten each round; see the
+    // note on rounds above, and MB_LOWEST_START for what sets the floor.
+    startingRounds: [10, 9, 8],
     wins: 'high',
     roundCell: 'bid-took',
     // Who deals and who bids first moves round the table, so the rows are the
@@ -69,6 +83,14 @@ export function roundsFor(id) {
 // only sheet there is, so it's the safer thing to guess for a type off this list.
 export function winsWith(id) {
   return gameType(id)?.wins ?? 'low';
+}
+
+/* Which rounds this game can open on, or null for one that only opens the one
+   way — which is every game bar Mormon Bridge, so the roster screen doesn't ask.
+   Asked of the game for the same reason as the notice and the groups below: that
+   screen stays one screen however many games there end up being. */
+export function startingRoundsFor(id) {
+  return gameType(id)?.startingRounds ?? null;
 }
 
 // Whether this game splits its table into groups. No, for a type that hasn't

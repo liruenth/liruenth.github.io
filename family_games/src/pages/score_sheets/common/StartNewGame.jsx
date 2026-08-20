@@ -7,8 +7,9 @@
 */
 import { useState, useEffect } from 'react'
 import { fetchFamilyPlayers } from '../../../api/routes'
-import { setupNoticeFor, hasGroups } from '../../../helpers/gameTypes'
+import { setupNoticeFor, hasGroups, startingRoundsFor } from '../../../helpers/gameTypes'
 import { clampGroups, saveGroups } from '../../../helpers/groups'
+import { saveStartingRound } from '../../../helpers/startingRound'
 import './StartNewGame.css'
 
 // Used when the roster can't be read, so the flow stays usable. Not used for a
@@ -40,6 +41,13 @@ function StartNewGame({ gameType, familyName, setFamilyName, onConfirm }) {
      is so the table opens split rather than being split after the fact. */
   const splitsIntoGroups = hasGroups(gameType);
 
+  /* Which rounds this game can open on, or nothing where it only opens the one
+     way. Asked of the game for the same reason as the two above. Mormon Bridge is
+     the one that answers: ten cards each is more than the deck holds once there
+     are six playing, so a big table opens lower and repeats its opening round to
+     keep the game ten rounds long. */
+  const startingRounds = startingRoundsFor(gameType);
+
   const [familyInput, setFamilyInput] = useState('');
   const [players, setPlayers] = useState([]);
   const [selected, setSelected] = useState([]);
@@ -48,6 +56,10 @@ function StartNewGame({ gameType, familyName, setFamilyName, onConfirm }) {
      the same reason GroupsModal does: correcting it on every keystroke would take
      the first digit of a two-digit count away before the second one arrived. */
   const [groups, setGroups] = useState('1');
+  /* The ordinary game, which the list names first. Held as the option's string
+     because that's what a select hands back, and clamped to a number on the way
+     into storage — see helpers/startingRound.js. */
+  const [startingRound, setStartingRound] = useState(() => String(startingRounds?.[0] ?? ''));
   // Arriving with a family already set means the effect below is about to
   // fetch, so open in the loading state rather than flashing an empty roster.
   const [loading, setLoading] = useState(() => !!familyName);
@@ -144,6 +156,12 @@ function StartNewGame({ gameType, familyName, setFamilyName, onConfirm }) {
       saveGroups(clampGroups(groups, maxGroups));
     }
 
+    // Handed over the same way and for the same reason. Only the sheet's seeding
+    // reads it, and after that the sheet holds its own rounds.
+    if (startingRounds) {
+      saveStartingRound(startingRound);
+    }
+
     onConfirm(selected);
   };
 
@@ -224,6 +242,25 @@ function StartNewGame({ gameType, familyName, setFamilyName, onConfirm }) {
         />
         <button type="submit" disabled={!newPlayer.trim()}>Add</button>
       </form>
+
+      {/* Asked here rather than on the sheet because it decides what columns the
+          sheet has: the opening round is played more than once to make the game
+          up to ten, so picking it after the fact would be rewriting the rounds
+          under whatever had already been entered. */}
+      {startingRounds && (
+        <label className="starting-round-field" htmlFor="start-round">
+          Starting Round
+          <select
+            id="start-round"
+            value={startingRound}
+            onChange={(e) => setStartingRound(e.target.value)}
+          >
+            {startingRounds.map((round) => (
+              <option key={round} value={round}>{round}</option>
+            ))}
+          </select>
+        </label>
+      )}
 
       {/* .groups-field is the modal's own field, shared the way .modal-actions
           already is — the sheet asks this same question mid-game, and the two

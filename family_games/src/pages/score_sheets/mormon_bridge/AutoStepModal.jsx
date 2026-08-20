@@ -6,7 +6,8 @@ import {
   clampToRound,
   firstUnfinishedRound,
   nextBlankStep,
-  setCellValue
+  setCellValue,
+  tricksIn
 } from '../../../helpers/mormonBridge'
 import './AutoStepModal.css'
 
@@ -173,7 +174,7 @@ function AutoStepModal({ scores, cols, removed, onEntered, onClose }) {
           inputMode="numeric"
           enterKeyHint="next"
           min="0"
-          max={step.round}
+          max={tricksIn(step.round)}
           step="1"
           aria-label={step.field === 'bid'
             ? `${step.player} bid, round ${step.round}`

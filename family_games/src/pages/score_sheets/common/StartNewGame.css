@@ -84,3 +84,30 @@
   text-align: left;
   max-width: 600px;
 }
+
+/* The same field as .groups-field in GroupsModal.css, with a select in it rather
+   than a number to type into: there are three rounds a game can open on and no
+   fourth to allow for. Not that class itself, because this question is only ever
+   asked here — the sheet has no modal to ask it again from, since the rounds are
+   fixed once the sheet is seeded. */
+.starting-round-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-h);
+  white-space: nowrap;
+}
+
+.starting-round-field select {
+  font: inherit;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.starting-round-field select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

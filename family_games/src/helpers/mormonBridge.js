@@ -10,11 +10,93 @@ the API needs a row for — see buildScoreRows in api/routes.js.
 Blank, not null, for a value nobody has entered: that's what the sheet's other
 helpers already read as an unplayed round.
 */
-import { roundsFor } from './gameTypes';
+/* ---------------------------------------------------------------------------
+   The rounds a game is played over.
 
-// From gameTypes rather than written again here — that list is also what orders
-// the stats page's columns, and two copies could disagree.
-export const MB_ROUNDS = roundsFor('MB');
+   Ten cards dealt down to one, so a game is ten rounds — but the deck runs out
+   before ten cards each does: six players want sixty cards and there are
+   fifty-two. A table that big opens lower and plays its opening round more than
+   once, which keeps every game the same ten rounds however many are sitting at
+   it.
+
+   The repeats are told apart by a mark on the round's name, and the mark is part
+   of the name: it's what the sheet shows, what gets stored, and what the stats
+   page reads back. Marked rounds come first, so a row of them reads in the order
+   they were played — `9+` then `9`, or `8+` then `8-` then `8`.
+
+   A mark is a label and nothing else. `9+` is a nine-trick round exactly as `9`
+   is, so everything that asks how many tricks are on the table goes through
+   tricksIn below rather than reading the name as a number.
+   --------------------------------------------------------------------------- */
+
+// A game is this many rounds however high it opens, which is what the repeats are
+// for.
+export const MB_ROUNDS_IN_GAME = 10;
+
+/* One mark per repeat bar the last, which goes unmarked — so the marks are also
+   what decides how low a game can open. A third mark here would allow a seventh
+   round to open on and nothing else would need changing. */
+const REPEAT_MARKS = ['+', '-'];
+
+const MARKED = /[+-]$/;
+
+// The lowest round a game can open on, which the marks above decide.
+export const MB_LOWEST_START = MB_ROUNDS_IN_GAME - REPEAT_MARKS.length;
+
+/* The rounds a game opening on `start` is played over: that round repeated as
+   many times as it takes to make ten, then the countdown from it down to one.
+
+   Clamped rather than trusted, because the number comes back out of storage as
+   whatever was last written there — and a start the marks can't label would
+   otherwise build a game of fewer than ten rounds. */
+export function mbRounds(start) {
+  const entered = Math.floor(Number(start));
+  const first = Number.isFinite(entered)
+    ? Math.min(Math.max(entered, MB_LOWEST_START), MB_ROUNDS_IN_GAME)
+    : MB_ROUNDS_IN_GAME;
+
+  // The opening round again for every round the countdown is short of ten.
+  const extra = MB_ROUNDS_IN_GAME - first;
+  const opening = REPEAT_MARKS.slice(0, extra).map((mark) => `${first}${mark}`);
+
+  const countdown = [];
+  for (let round = first; round >= 1; round -= 1) {
+    countdown.push(String(round));
+  }
+
+  return [...opening, ...countdown];
+}
+
+/* How many tricks are on the table in a round: the round's own number, with any
+   repeat mark read past. parseInt rather than Number, because Number('9+') is
+   NaN and the mark is exactly what has to be ignored. */
+export function tricksIn(round) {
+  return parseInt(round, 10);
+}
+
+/* Which round a game opened on, read back off the rounds it holds. Every mark in
+   a game sits on its opening round, so the first marked round found names it;
+   nothing marked is the ordinary game that opened on ten.
+
+   Read back rather than stored, because the round names already say it — `8+` is
+   a round only a game that opened on eight has — so there is no second copy of
+   the answer to keep in step. */
+export function mbStartingRound(rounds) {
+  const marked = [...rounds].find((round) => MARKED.test(round));
+  return marked ? tricksIn(marked) : MB_ROUNDS_IN_GAME;
+}
+
+/* The rounds a sheet is being played over, which is any player's row: emptySheet
+   below seeds every round of every player up front, and so does the rebuild a
+   finished game is opened back up on — see rebuildSheet in helpers/editGame.js.
+
+   Read off the sheet rather than worked out again from where the game opened, so
+   a sheet restored from storage and a finished game reopened both keep the rounds
+   they were actually played on rather than whichever start was last picked. */
+export function sheetRounds(scores) {
+  const first = scores.values().next().value;
+  return first ? [...first.keys()] : [];
+}
 
 /* Taking every trick you bid for is worth a bonus, and a bigger one if what you
    bid for was the whole round. Round one is the exception: one trick out of one
@@ -23,7 +105,7 @@ export const MB_ROUNDS = roundsFor('MB');
    Blank until both halves are in — a score off a bid with no took yet would read
    as a round that had been played. */
 export function roundScore(round, bid, took) {
-  const target = Number(round);
+  const target = tricksIn(round);
   const called = Number(bid);
   const won = Number(took);
 
@@ -70,7 +152,7 @@ export function clampToRound(value, round) {
     return '';
   }
 
-  return String(Math.min(Math.max(entered, 0), Number(round)));
+  return String(Math.min(Math.max(entered, 0), tricksIn(round)));
 }
 
 /* Writes one value into the sheet and re-scores the round it's in.
@@ -96,12 +178,19 @@ export function setCellValue(scores, player, round, field, value) {
 
 /* A new sheet: every player, every round, all blank. Seeded in full rather than
    filled in as rounds are played, so nothing downstream has to cope with a round
-   that isn't there yet — the cell renderer always has a cell, and Auto Step can
-   walk the rounds it can see. */
-export function emptySheet(players) {
+   that isn't there yet — the cell renderer always has a cell, Auto Step can walk
+   the rounds it can see, and sheetRounds above can read the round list back off
+   any row.
+
+   Which rounds those are depends on where the game opens, so it's asked for
+   rather than assumed. Ten by default: the ordinary game, and what a caller with
+   nothing to say about it means. */
+export function emptySheet(players, start = MB_ROUNDS_IN_GAME) {
+  const rounds = mbRounds(start);
+
   return new Map(players.map((player) => [
     player,
-    new Map(MB_ROUNDS.map((round) => [round, emptyCell()]))
+    new Map(rounds.map((round) => [round, emptyCell()]))
   ]));
 }
 
@@ -212,5 +301,5 @@ export function bidTally(players, scores, round) {
     }
   }
 
-  return { left: Number(round) - bid, remaining };
+  return { left: tricksIn(round) - bid, remaining };
 }

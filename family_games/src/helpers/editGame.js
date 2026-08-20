@@ -14,6 +14,7 @@ happened to be pointing at.
 */
 import { bumpGameId, gameSubmitted } from './gameId';
 import { GROUPS_KEY, saveGroups } from './groups';
+import { STARTING_ROUND_KEY } from './startingRound';
 import { saveSheet, clearSheet } from './sheetStorage';
 import { emptyCell } from './mormonBridge';
 import { roundCellFor } from './gameTypes';
@@ -51,6 +52,10 @@ function clearDesk() {
   clearSheet();
   localStorage.removeItem('gameType');
   localStorage.removeItem(GROUPS_KEY);
+  /* Nothing restores it — the sheet an edit is rebuilt on brings the rounds the
+     game was played over, so there is no start to pick. Cleared all the same, so
+     the next new game isn't opened on the last one's. */
+  localStorage.removeItem(STARTING_ROUND_KEY);
   REMOVED_KEYS.forEach((key) => localStorage.removeItem(key));
 }
 

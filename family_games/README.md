@@ -50,6 +50,13 @@ the rows, which matters for the reason below.
 - **Mormon Bridge: row order is the seating.** There's no seat column, so players
   are seated in the order the importer first meets them — sorted by `date_round`
   then `player_round` where those columns exist, otherwise in CSV order.
+- **Mormon Bridge rounds are `10` down to `1`, and a game that opened lower marks
+  its repeats.** Ten cards each is more than the deck holds once six are playing,
+  so a big table opens on nine or eight and plays that round again to keep the
+  game ten rounds long: `9+, 9, 8, …, 1` or `8+, 8-, 8, 7, …, 1`. Write the mark
+  in the `round` column — it's part of the round's name, and it's how the stats
+  page knows to put the repeats at the front of the game rather than after it.
+  The mark is a label only: `9+` is a nine-trick round exactly as `9` is.
 - It writes straight to DynamoDB and bypasses the Lambda, so none of the API's
   row validation applies to it.
 

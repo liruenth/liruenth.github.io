@@ -13,7 +13,7 @@ every string is uppercased, and the fields are renamed (`player`, not
 `player_name`). The renaming is why the rows are read by their stored names below.
 */
 import { rowTotal, sortedByTotal } from './scoring';
-import { mbRowTotal } from './mormonBridge';
+import { mbRowTotal, mbRounds, mbStartingRound } from './mormonBridge';
 import { roundsFor, winsWith, roundCellFor, rowOrderFor, GAME_TYPE_IDS } from './gameTypes';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -83,11 +83,11 @@ function foldPlayers(players, bidTook) {
 }
 
 /* A game into the sheet that was played, plus what the stats page sorts and
-   filters on. Every round of the type gets a column, played or not, so games
-   stacked one under another line up rather than each being its own width — a game
-   that ended early is blank in the rounds it never reached, exactly as its sheet
-   looked. Rounds the type doesn't list are appended, so data written before a
-   round list changed still renders in full.
+   filters on. Every round the game was played over gets a column, reached or not,
+   so games stacked one under another line up rather than each being its own width
+   — a game that ended early is blank in the rounds it never got to, exactly as its
+   sheet looked. Rounds that list doesn't hold are appended, so data written before
+   a round list changed still renders in full.
 
    A cell is whatever that type's round holds — a score, or the bid and took with
    the score worked out from them — so a rebuilt game is the same shape the sheet
@@ -101,7 +101,14 @@ function buildGame(gameId, type, game) {
 
   const { scores, seats, seenRounds } = foldPlayers(game.players, bidTook);
 
-  const known = roundsFor(type);
+  /* Which rounds this game gets a column for. Not simply the type's list, because
+     a Mormon Bridge game's rounds depend on where it opened: a table too big to be
+     dealt ten cards each opens on nine or eight and repeats that round to keep the
+     game ten long. Nothing stores which — the round names carry it, `8+` being a
+     round only a game that opened on eight has — so it's read back off the rounds
+     the game holds. That is also what puts the repeats at the front where they were
+     played rather than appended below as rounds the type doesn't list. */
+  const known = bidTook ? mbRounds(mbStartingRound(seenRounds)) : roundsFor(type);
   const rounds = [...known, ...seenRounds.filter((round) => !known.includes(round))];
 
   const totals = new Map(

@@ -6,10 +6,8 @@ import ConfirmModal from '../common/ConfirmModal'
 import RemovePlayerModal from '../common/RemovePlayerModal'
 import SubmitGame from '../common/SubmitGame'
 import { useRemovedPlayers, MB_REMOVED_KEY } from '../common/removedPlayers'
-import { emptySheet } from '../../../helpers/mormonBridge'
-import { roundsFor } from '../../../helpers/gameTypes'
-
-const cols = roundsFor('MB');
+import { emptySheet, sheetRounds } from '../../../helpers/mormonBridge'
+import { readStartingRound } from '../../../helpers/startingRound'
 
 function MormonBridge({players, scoreData, setScoreData, onSubmitGame, onSubmitted, onNewGame}) {
   /* Built once per game so entered scores survive re-renders. A restored sheet
@@ -20,7 +18,23 @@ function MormonBridge({players, scoreData, setScoreData, onSubmitGame, onSubmitt
      something outside the grid has written, which is Auto Step. Nothing here ever
      reorders it: the order the players were entered in is the order they're
      sitting in, and that's what the bidding follows. */
-  const [scores, setScores] = useState(() => scoreData ?? emptySheet(players));
+  const [scores, setScores] = useState(() => scoreData ?? emptySheet(players, readStartingRound()));
+
+  /* The rounds this game is played over, read off the sheet rather than asked of
+     the game type — where a Mormon Bridge game opens is a choice made per game,
+     and a big table opens lower and repeats that round to keep the game ten long.
+
+     Off the sheet rather than from the stored choice, because the sheet is the one
+     that answers for all three ways of arriving here: a new game seeded above, a
+     game restored from storage mid-play, and a finished game opened back up for
+     editing — the last of which brings its own rounds and never picked a start at
+     all.
+
+     In state so its identity holds for the life of the sheet. The grid rebuilds
+     every column when this changes, and Auto Step hands up a new Map on every
+     entry — so deriving it on each render would rebuild the columns under the
+     cell being typed into. */
+  const [cols] = useState(() => sheetRounds(scores));
   const [removed, setRemoved, clearRemoved] = useRemovedPlayers(MB_REMOVED_KEY);
   const [autoStepping, setAutoStepping] = useState(false);
   const [removingPlayer, setRemovingPlayer] = useState(false);

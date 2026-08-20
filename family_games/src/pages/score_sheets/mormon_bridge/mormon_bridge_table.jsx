@@ -28,7 +28,7 @@ import {
   TOTAL_SOURCE
 } from '../common/sheetGrid';
 import RoundWedges from './RoundWedges';
-import { mbRowTotal, setCellValue, clampToRound } from '../../../helpers/mormonBridge';
+import { mbRowTotal, setCellValue, clampToRound, tricksIn } from '../../../helpers/mormonBridge';
 import { positionsByTotal } from '../../../helpers/scoring';
 import { winsWith } from '../../../helpers/gameTypes';
 import './round_cell.css';
@@ -83,7 +83,7 @@ function RoundCell({ data, value, colDef, node, onEnter, onCommit }) {
         type="number"
         inputMode="numeric"
         min="0"
-        max={round}
+        max={tricksIn(round)}
         step="1"
         aria-label={`${data.player} bid, round ${round}`}
         disabled={disabled}
@@ -96,7 +96,7 @@ function RoundCell({ data, value, colDef, node, onEnter, onCommit }) {
         type="number"
         inputMode="numeric"
         min="0"
-        max={round}
+        max={tricksIn(round)}
         step="1"
         aria-label={`${data.player} took, round ${round}`}
         disabled={disabled}
