@@ -31,6 +31,20 @@ export function titleCase(name) {
   return String(name ?? '').toLowerCase().replace(/\b\p{L}/gu, (c) => c.toUpperCase());
 }
 
+/* A family name as typed, and whether it was typed with editing asked for. The
+   stats page is a reading page — the pencils that hand a game back to the score
+   sheet are there for fixing a mistyped score, not for browsing with, so they're
+   asked for by name: a `*` on the end of the family turns them on for that visit.
+   The star is no part of the family, so it comes off before the name is looked up,
+   shown or remembered, and the same family reads the same either way. */
+export function parseFamilyName(input) {
+  const typed = String(input ?? '').trim();
+  const editable = typed.endsWith('*');
+
+  // Trimmed again, since the star can be typed away from the name it is on
+  return { name: (editable ? typed.slice(0, -1) : typed).trim(), editable };
+}
+
 /* Split on the parts rather than handing the string to Date, which reads a
    bare YYYY-MM-DD as UTC and so names the day before for anyone behind it —
    the same trap that keeps helpers/gameId.js off toISOString(). */

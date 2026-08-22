@@ -1,5 +1,6 @@
 /*
 - prompt user for `family name` (every visit, prefilled from the last one used)
+- a `*` on the end of that name also puts the edit pencils on the games
 - pull that family's whole history from the API, one request per game type
 - pivot each game back into the sheet it was played on and stack them, newest first
 - filter and order the stack from the header, or switch to per-player totals
@@ -40,6 +41,10 @@ function Stats() {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [sort, setSort] = useState(DEFAULT_SORT);
   const [view, setView] = useState('games');
+  /* Whether the name was asked with a star on the end, which is what puts the edit
+     pencils on the games. Held for the family that was asked for rather than for
+     the page, so going back for another family asks again. */
+  const [editable, setEditable] = useState(false);
   // The game waiting on the reader saying the sheet can be cleared, or null when
   // there was nothing on it to ask about
   const [replacing, setReplacing] = useState(null);
@@ -52,9 +57,10 @@ function Stats() {
   /* The family is set before the request rather than after it, so the header is
      already up to say whose games are loading — and to offer the way back out if
      the request is the thing that fails. */
-  const loadGames = async (name) => {
+  const loadGames = async (name, withEditing) => {
     localStorage.setItem(FAMILY_KEY, name);
     setFamilyName(name);
+    setEditable(withEditing);
     setLoading(true);
     setError(null);
     resetFilters();
@@ -95,6 +101,7 @@ function Stats() {
     setFamilyName('');
     setGames([]);
     setError(null);
+    setEditable(false);
     // The request can still be on its way in — clearing the family before it
     // lands would otherwise leave the form behind a loading notice it can't clear.
     setLoading(false);
@@ -142,13 +149,15 @@ function Stats() {
         view === 'games'
           ? (
             <div className="game-list">
-              {/* A game the sheet couldn't write back is shown without the way in,
-                  rather than with one that would file it somewhere else */}
+              {/* Only a family asked for with a star gets the pencils at all, and
+                  then only on the games the sheet can write back: one it couldn't is
+                  shown without the way in, rather than with one that would file it
+                  somewhere else */}
               {visible.map((game) => (
                 <GameTable
                   key={game.key}
                   game={game}
-                  onEdit={canEdit(game) ? editGame : undefined}
+                  onEdit={editable && canEdit(game) ? editGame : undefined}
                 />
               ))}
             </div>
