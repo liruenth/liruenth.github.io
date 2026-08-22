@@ -4,6 +4,8 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, BatchWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { fromIni } from '@aws-sdk/credential-providers';
 import { buildGames } from './src/api/lambda.js';
+import { roundsFor, startingRoundsFor } from './src/helpers/gameTypes.js';
+import { mbRounds } from './src/helpers/mormonBridge.js';
 
 /* Credentials come from ~/.aws/credentials, never from this file — a key written
    in here is a key one `git add -A` away from being in the history for good.
@@ -39,13 +41,101 @@ const CSV_FILE_PATH = './test_game.csv'; // Path to your CSV file
    either. Passed through where the CSV names them, left off where it doesn't: a
    Mormon Bridge game without them imports as scores alone, with the bid and took
    halves of every round blank. */
-function submittedRows(rows) {
-  const usable = rows.filter((row) => row.id && row.type);
-  const dropped = rows.length - usable.length;
 
-  if (dropped) {
-    console.warn(`Skipped ${dropped} rows with no id or no type`);
+/* Whether a cell holds a number somebody entered. What the app asks of its own
+   sheet before submitting it — see enteredNumber in src/api/routes.js — with a
+   trim it doesn't need: a sheet's cells come from number inputs, where a
+   spreadsheet's can hold a stray space. */
+function entered(value) {
+  const text = String(value ?? '').trim();
+  return text !== '' && Number.isFinite(Number(text));
+}
+
+/* Why a row isn't a round anyone played, or null where it is. The same checks the
+   app makes of a sheet on its way out, so an imported game holds what a played one
+   would rather than more.
+
+   A round with no score is the ordinary case, not a mistake: nobody reached it, or
+   the player was out by then. It's left out rather than written down, because
+   `Number('')` is 0 and a nought is a round played badly — which is the one thing
+   a round nobody played is not. The app drops these the same way.
+
+   A row with no round at all is the summary line a spreadsheet keeps at the
+   bottom. It carries the id and the type of the rows above it, so nothing else
+   here would catch it, and folded in it becomes a round of its own with everyone's
+   totals for scores. */
+function skipReason(row) {
+  if (!row.id || !row.type) {
+    return 'no id or no type';
   }
+  if (String(row.round ?? '').trim() === '') {
+    return 'no round name — a totals row?';
+  }
+  if (!entered(row.score)) {
+    return 'no score — a round nobody played';
+  }
+
+  return null;
+}
+
+/* Every round name a game knows. For a game that can open on more than one round
+   that's every round any of those openings produces — `9+` and `8-` included,
+   since which of them a game holds is the whole record of where it opened. */
+function knownRounds(type) {
+  const starts = startingRoundsFor(type);
+  return new Set(starts ? starts.flatMap((start) => mbRounds(start)) : roundsFor(type));
+}
+
+/* Names a round the game doesn't list, without dropping it.
+
+   Not dropped, because that's how a game written under an older round list comes
+   back at all — statsData appends what it doesn't recognise rather than losing it,
+   and this import is the way such a game gets in. But it's also exactly what a
+   totals row somebody labelled, a typo, and a column that didn't line up all look
+   like, and those are worth hearing about before they become a column on the
+   stats page. */
+function reportUnknownRounds(rows) {
+  const known = new Map();
+  const unknown = new Map();
+
+  for (const row of rows) {
+    const type = String(row.type).toUpperCase();
+    const round = String(row.round).trim().toUpperCase();
+
+    if (!known.has(type)) {
+      known.set(type, knownRounds(type));
+    }
+    if (!known.get(type).has(round)) {
+      const key = `${type} "${round}"`;
+      unknown.set(key, (unknown.get(key) ?? 0) + 1);
+    }
+  }
+
+  for (const [key, count] of unknown) {
+    console.warn(`Importing ${count} row${count === 1 ? '' : 's'} of ${key}, which is not a round ${key.split(' ')[0]} lists — check the round column`);
+  }
+}
+
+function submittedRows(rows) {
+  const usable = [];
+  const skipped = new Map();
+
+  for (const row of rows) {
+    const reason = skipReason(row);
+    if (reason) {
+      skipped.set(reason, (skipped.get(reason) ?? 0) + 1);
+    } else {
+      usable.push(row);
+    }
+  }
+
+  // Counted by reason rather than in one lump, so a row left out on purpose reads
+  // differently from a column that didn't line up.
+  for (const [reason, count] of skipped) {
+    console.warn(`Skipped ${count} row${count === 1 ? '' : 's'}: ${reason}`);
+  }
+
+  reportUnknownRounds(usable);
 
   /* Grouped by date and round the way the index would have answered — but no
      further. Ordering within a round used to break the tie on `player_round`,
@@ -71,13 +161,13 @@ function submittedRows(rows) {
         type: row.type,
       };
 
-      /* Only where the column is there and filled in, so a row comes out the same
-         shape a played one does. An empty cell is a column the sheet keeps for the
-         other game's sake, not a bid of nothing: buildGames would drop it either
-         way, but a blank is what the API rejects a row for, and this import is the
-         one path that doesn't go past that check. */
+      /* Only where the column is there and holds a number, so a row comes out the
+         same shape a played one does. An empty cell is a column the sheet keeps
+         for the other game's sake, not a bid of nothing: buildGames would drop it
+         either way, but a blank is what the API rejects a row for, and this import
+         is the one path that doesn't go past that check. */
       for (const field of ['bid', 'took', 'seat']) {
-        if (row[field] !== undefined && row[field] !== '') {
+        if (entered(row[field])) {
           built[field] = row[field];
         }
       }

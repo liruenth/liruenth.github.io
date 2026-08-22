@@ -62,6 +62,15 @@ orders the rows if the sheet has it; `player_round` and `family_type` are ignore
   in the `round` column — it's part of the round's name, and it's how the stats
   page knows to put the repeats at the front of the game rather than after it.
   The mark is a label only: `9+` is a nine-trick round exactly as `9` is.
+- **Leave a round nobody played blank and it's left out**, not stored as a nought
+  — so a player who dropped out mid-game needs no tidying up, and their unplayed
+  rounds read as blank on the stats page rather than as rounds they scored nothing
+  in. A blank `round` cell is skipped too, which is what a spreadsheet's totals
+  row looks like. Both are counted on the way past.
+- **A round name the game doesn't list is imported anyway, with a warning.** It
+  has to be, or a game written under an older round list couldn't come back at
+  all — but it's also what a labelled totals row, a typo and a column that didn't
+  line up look like, so check the warning rather than ignoring it.
 - It writes straight to DynamoDB and bypasses the Lambda, so none of the API's
   row validation applies to it.
 
