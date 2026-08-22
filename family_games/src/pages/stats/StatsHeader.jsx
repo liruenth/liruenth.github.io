@@ -54,7 +54,7 @@ function StatsHeader({
   };
 
   const filtered = filters.players.length > 0 ||
-    !!filters.dateFrom || !!filters.dateTo || !!filters.type;
+    !!filters.dateFrom || !!filters.dateTo || !!filters.type || !!filters.status;
 
   return (
     <div className="stats-header">
@@ -137,6 +137,18 @@ function StatsHeader({
             {GAME_TYPES.map((type) => (
               <option key={type.id} value={type.id}>{type.label}</option>
             ))}
+          </select>
+        </label>
+
+        {/* A game nobody played the last round of has no winner, and is kept out
+            of everything the player boards count — so being able to pick them out
+            is how you see what the boards are leaving alone. */}
+        <label className="stats-filter">
+          Status
+          <select value={filters.status} onChange={update('status')}>
+            <option value="">All games</option>
+            <option value="finished">Finished</option>
+            <option value="unfinished">Unfinished</option>
           </select>
         </label>
 

@@ -78,6 +78,19 @@ light mode.
   background: var(--accent-bg);
 }
 
+/* The same chip as the game's name beside it, in the muted colours rather than
+   the accent: it says what the game didn't get to, which is not a thing to draw
+   the eye before the game itself. Opaque, unlike --social-bg, since the same
+   chip reads against the record modal's own background as well as the page. */
+.game-unfinished {
+  font-size: 15px;
+  font-weight: 400;
+  padding: 2px 8px;
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--code-bg);
+}
+
 /* Seven rounds plus a total is wider than a phone, so the table scrolls inside
    its own box rather than taking the page sideways with it. */
 .stats-table-scroll {

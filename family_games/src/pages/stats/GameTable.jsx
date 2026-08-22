@@ -41,7 +41,7 @@ function PencilIcon() {
    a different game to look at. */
 function GameTable({ game, onEdit }) {
   // Row order is the game's own: ranked, or the order it was played in
-  const { date, gameNumber, type, rounds, scores, totals, order, winners } = game;
+  const { date, gameNumber, type, rounds, scores, totals, order, winners, unfinished } = game;
   const bidTook = roundCellFor(type) === 'bid-took';
   const roundCellClass = bidTook ? 'stats-round-cell' : undefined;
 
@@ -50,6 +50,10 @@ function GameTable({ game, onEdit }) {
       <h2>
         {formatDate(date)}{gameNumber ? ` · Game ${gameNumber}` : ''}
         <span className="game-type">{gameTypeLabel(type)}</span>
+        {/* Nobody played the last round, so no row below is a winning one. Said
+            here rather than left to be inferred from a table with nothing
+            highlighted in it, which reads the same as a game that was drawn. */}
+        {unfinished && <span className="game-unfinished">Unfinished</span>}
         {/* Shown on hover, and on focus so it can be reached without a pointer —
             see .game-edit in StatsTable.css. Inside the heading rather than beside
             it because that's what it names, which does mean its label is read as

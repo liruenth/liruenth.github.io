@@ -82,6 +82,28 @@ function foldPlayers(players, bidTook) {
   return { scores, seats, seenRounds };
 }
 
+/* Who played the game out: everyone with a score in its last round.
+
+   The last round of the game's own list, not the last one anybody got to. Those
+   are the same thing in a game that was played out, and in one that was abandoned
+   they are the difference between the game having a winner and not having one —
+   whoever got furthest into a game everybody walked away from didn't win it.
+
+   Read off what's stored, which holds only the rounds that were played: a round
+   left blank on the sheet is never written, so having a score in a round and
+   having played it are the same thing.
+
+   Nobody, and the game was never finished — see `unfinished` below. */
+function finishersOf(rounds, scores) {
+  const last = rounds[rounds.length - 1];
+
+  return new Set(
+    last === undefined
+      ? []
+      : [...scores.keys()].filter((player) => scores.get(player).has(last))
+  );
+}
+
 /* A game into the sheet that was played, plus what the stats page sorts and
    filters on. Every round the game was played over gets a column, reached or not,
    so games stacked one under another line up rather than each being its own width
@@ -114,21 +136,62 @@ function buildGame(gameId, type, game) {
   const totals = new Map(
     [...scores].map(([player, playerScores]) => [player, total(playerScores, rounds)])
   );
-  const scoreList = [...totals.values()];
-  const lowestTotal = scoreList.length ? Math.min(...scoreList) : null;
-  const highestTotal = scoreList.length ? Math.max(...scoreList) : null;
+
+  /* Who was still at the table at the end, and whether anybody was.
+
+     A player who left part-way has only the rounds they played to total, and in a
+     game the low score takes that is a shorter total than anyone who stayed — so
+     left alone it hands the win to whoever quit earliest, which is the one way a
+     game cannot be won. The win goes to the best total among those who saw the
+     last round out, and the rest rank below them however they totalled. That is
+     what the sheet already does with a player who's been removed mid-game; the
+     difference here is that being removed isn't stored, so a finished game has to
+     read it off who has a score in the last round.
+
+     `known` rather than `rounds`, so a round the type doesn't list — appended at
+     the end for a game written under an older list — can't stand in as the round
+     the game had to reach.
+
+     Nobody at all, and the game was abandoned rather than won. It keeps its scores
+     and its totals, and it is left without a winner. Worked out here rather than
+     stored, because the rounds already say it. */
+  const finishers = finishersOf(known, scores);
+  const unfinished = finishers.size === 0;
+
+  /* The ends of the game, over the players who played it out — so the winning
+     total is one of them, and a total nobody could have won on is neither.
+
+     A game nobody finished has no such end, and falls back to the whole table:
+     the two total sorts still have to be able to order it against everything else.
+     See sortGames. */
+  const played = [...totals].filter(([player]) => finishers.has(player)).map(([, sum]) => sum);
+  const spread = played.length ? played : [...totals.values()];
+  const lowestTotal = spread.length ? Math.min(...spread) : null;
+  const highestTotal = spread.length ? Math.max(...spread) : null;
 
   /* The sheet ranks low total first, which is Contract Rummy's order but the
      wrong way round for a game high score takes — so it's reversed for those,
      leaving the winner the top row of either. Everyone level with the winning
      total won it: a tie is a tie, not whichever of them the sort put first. */
   const high = winsWith(type) === 'high';
-  // Nobody is out of play in a finished game — a player removed while it was on
-  // has the rows they played and is ranked on them like anyone else.
   const ascending = [...sortedByTotal(scores, rounds, null, total).keys()];
-  const ranked = high ? [...ascending].reverse() : ascending;
-  const winningTotal = high ? highestTotal : lowestTotal;
-  const winners = ranked.filter((player) => totals.get(player) === winningTotal);
+  const byTotal = high ? [...ascending].reverse() : ascending;
+
+  /* Players who didn't finish sink, and are sunk after the reverse rather than by
+     handing sortedByTotal the set: it sinks to the end of the ascending order,
+     which is the end a high-score game then reverses to the front. Partitioned
+     instead, so they land below the players who finished whichever way round the
+     game is read — and in an unfinished game nobody finished, so the partition is
+     every player and the order comes out untouched. */
+  const ranked = [
+    ...byTotal.filter((player) => finishers.has(player)),
+    ...byTotal.filter((player) => !finishers.has(player)),
+  ];
+
+  const winningTotal = unfinished ? null : (high ? highestTotal : lowestTotal);
+  const winners = unfinished
+    ? []
+    : ranked.filter((player) => finishers.has(player) && totals.get(player) === winningTotal);
 
   /* The order the game was actually played in, where the rows say. Mormon Bridge
      is played round the table and its rows are the seating, so a finished game
@@ -171,6 +234,10 @@ function buildGame(gameId, type, game) {
        see helpers/editGame.js. */
     seated,
     winners,
+    /* Nobody played the last round, so nobody won it. It still shows on the page
+       with everything that was scored in it — it just isn't a result, so it's kept
+       out of what the player boards count and can be filtered for on its own. */
+    unfinished,
     playerCount: scores.size,
     lowestTotal,
     highestTotal,
@@ -292,16 +359,26 @@ function record(current, value, game, better) {
    the type's round list, since that lists every round of the game whether it was
    reached or not — a game that ended early would be read as rounds of undefined. */
 function addGame(stats, game, player, bidTook) {
-  const total = game.totals.get(player);
+  /* A game nobody finished is no result, so it counts for nothing that reads as
+     one: not as a game played, not against the win rate, and not as a total. A
+     total from a game that was abandoned isn't a low total, it's a short one, and
+     it would take the Lowest Total column off whoever really holds it.
 
-  stats.gamesPlayed += 1;
-  stats.totalPoints += total;
-  if (game.winners.includes(player)) {
-    stats.wins += 1;
+     The rounds are a different matter. They were played, whatever became of the
+     game around them, so a score, a bid or a took set in one still stands as the
+     best somebody has managed. */
+  if (!game.unfinished) {
+    const total = game.totals.get(player);
+
+    stats.gamesPlayed += 1;
+    stats.totalPoints += total;
+    if (game.winners.includes(player)) {
+      stats.wins += 1;
+    }
+
+    record(stats.records.lowestGameTotal, total, game, Math.min);
+    record(stats.records.highestGameTotal, total, game, Math.max);
   }
-
-  record(stats.records.lowestGameTotal, total, game, Math.min);
-  record(stats.records.highestGameTotal, total, game, Math.max);
 
   for (const cell of game.scores.get(player).values()) {
     if (bidTook) {
@@ -376,13 +453,24 @@ export function playerBoards(games) {
 function boardRows(type, byPlayer) {
   const ahead = winsWith(type) === 'high' ? -1 : 1;
 
+  /* A player can be on the board having played nothing that counted: every game
+     they were in was abandoned, and they're here for a round record set in one of
+     them. Neither rate means anything over no games, so the average is left blank
+     rather than worked out of nought — see PlayerBoard, which renders it as the
+     empty cell a record with no value gets. */
   return [...byPlayer.values()]
     .map(({ totalPoints, ...stats }) => ({
       ...stats,
-      winRate: stats.wins / stats.gamesPlayed,
-      avgTotal: Math.round(totalPoints / stats.gamesPlayed),
+      winRate: stats.gamesPlayed ? stats.wins / stats.gamesPlayed : 0,
+      avgTotal: stats.gamesPlayed ? Math.round(totalPoints / stats.gamesPlayed) : null,
     }))
-    .sort((a, b) => b.wins - a.wins || ahead * (a.avgTotal - b.avgTotal));
+    // And they sort last, below everyone with a game to be ranked on: an average
+    // there is no average sits at neither end of the order, it sits outside it.
+    .sort((a, b) => (
+      (b.gamesPlayed ? 1 : 0) - (a.gamesPlayed ? 1 : 0)
+      || b.wins - a.wins
+      || ahead * ((a.avgTotal ?? 0) - (b.avgTotal ?? 0))
+    ));
 }
 
 export const EMPTY_FILTERS = {
@@ -390,6 +478,9 @@ export const EMPTY_FILTERS = {
   dateFrom: '',
   dateTo: '',
   type: '',
+  // Empty for both, which is the page as it opens: an abandoned game is still a
+  // game that was played, so it's listed with the rest until it's asked about.
+  status: '',
 };
 
 /* Dates compare as strings: they're stored YYYY-MM-DD, which sorts the same way
@@ -399,10 +490,16 @@ export const EMPTY_FILTERS = {
    only games all of them were in — picking two people asks for their games, not
    just the ones they both sat at. */
 export function applyFilters(games, filters) {
-  const { players, dateFrom, dateTo, type } = { ...EMPTY_FILTERS, ...filters };
+  const { players, dateFrom, dateTo, type, status } = { ...EMPTY_FILTERS, ...filters };
 
   return games.filter((game) => {
     if (type && game.type !== type) {
+      return false;
+    }
+    if (status === 'finished' && game.unfinished) {
+      return false;
+    }
+    if (status === 'unfinished' && !game.unfinished) {
       return false;
     }
     if (dateFrom && game.date < dateFrom) {
@@ -459,7 +556,8 @@ export function sortGames(games, sortKey = DEFAULT_SORT) {
     case 'date-asc':
       return sorted.sort((a, b) => -byNewest(a, b));
     // The highest and lowest of a game are the ends of its ranking: the worst
-    // total anyone finished on, and the winning one.
+    // total anyone finished on, and the winning one. Both read over the players
+    // who played it out, so neither is a total somebody left the table holding.
     case 'total-desc':
       return sorted.sort((a, b) => b.highestTotal - a.highestTotal || byNewest(a, b));
     case 'total-asc':
