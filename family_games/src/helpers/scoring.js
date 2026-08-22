@@ -10,6 +10,36 @@ export function rowTotal(playerScores, cols) {
   }, 0);
 }
 
+/* The row total as it stood at each round: a Map of round to the sum of every
+   score up to and including it, for a table that shows where a player was on the
+   way through as well as where they ended up.
+
+   Only the rounds that were played get an entry. A round left blank was never
+   played — the same thing rowTotal above skips — and a total written against it
+   wouldn't be the total going into it, it would be a number the game never stood
+   at. So it reads back blank, exactly as the score beside it does. */
+export function runningTotals(playerScores, cols) {
+  const totals = new Map();
+  let sum = 0;
+
+  for (const col of cols) {
+    const value = playerScores.get(col);
+    const score = Number(value);
+
+    // Number('') is nought rather than NaN, so a blank has to be ruled out on the
+    // value itself — otherwise an unplayed round would take an entry holding the
+    // total of the rounds before it.
+    if (value === undefined || value === null || value === '' || !Number.isFinite(score)) {
+      continue;
+    }
+
+    sum += score;
+    totals.set(col, sum);
+  }
+
+  return totals;
+}
+
 /* A column is finished once nobody is still blank in it, whatever order it got
    filled in. Editors hand back strings, so an empty one is unplayed, not a score.
 

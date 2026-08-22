@@ -1,0 +1,86 @@
+/*
+The two-piece round cell: the round's own score above the diagonal, the total it
+put the player on below it.
+
+Built the same way as the sheet's three-triangle cell (round_cell.css) — each
+half laid over the whole cell and cut down to its triangle with clip-path, so the
+two tile it exactly with no seam to line up.
+
+  ┌───────────────┐   The diagonal runs from the bottom left to the top right,
+  │  15       ╱   │   which is the way the pair is written: score, slash, total.
+  │       ╱       │   Each number sits in the middle of its own triangle — a
+  │   ╱       52  │   third of the way in from the right angle, both ways.
+  └───────────────┘
+
+Only ever on the stats page, so unlike round_cell.css there's no light theme to
+hold to — that file's colours are fixed light because the sheet's grid stays in
+Balham's light theme whatever the page is doing, and nothing here sits in it. The
+default fill below is a neutral tint all the same, so it can be given the page's
+own token where the cell is used: see StatsTable.css.
+*/
+
+:root {
+  /* A grey mixed from black, for a component asked to stand on its own. The stats
+     table gives it the page's own text colour instead, which is the one place it's
+     used — the same arrangement round_cell.css has with --mb-closed-fill.
+
+     On :root rather than on .split-round, and that isn't a preference: a custom
+     property is read off the nearest ancestor that declares it, so a default on
+     the cell's own wrapper would sit *below* the table's override in the tree and
+     win over it. Declared at the top, it's the value that's there when nothing
+     else has said, which is what a default is. */
+  --split-fill: rgba(0, 0, 0, 0.07);
+  /* How tall the cell is drawn. The halves below need it as a number to place
+     their text against — see the padding on each — so whatever sets the cell's
+     height has to say it here too, or the text is centred against a cell of a
+     different size than the one it's in. */
+  --split-height: 46px;
+}
+
+.split-round {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Centred in the half rather than in the cell. A flex box centres in its content
+   box, so each half's is cut back to the two thirds of the cell its own triangle
+   leans into: the middle of that is a third of the way in from the right angle
+   both ways, which is where a triangle's three corners balance. Centred on the
+   cell instead, both numbers would sit on the diagonal.
+
+   The inline third is a percentage, which padding resolves against the width.
+   The block third can't be — a percentage there resolves against the width as
+   well, which would place the text by how wide the column happens to be — so it
+   comes off the height. Same reason round_cell.css works from
+   --sheet-row-height. */
+.split-half {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.split-half-score {
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  padding: 0 33.33% calc(var(--split-height) / 3) 0;
+}
+
+.split-half-total {
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  padding: calc(var(--split-height) / 3) 0 0 33.33%;
+  /* Smaller than the score, because it isn't one: it's the sum of every score to
+     here, and the round is what the column is a column of. */
+  font-size: 0.82em;
+  /* Also what draws the diagonal — the cell has no border inside it, so the
+     running total's fill is the only thing saying where the halves divide.
+
+     Its own colour rather than currentColor, so a winning row tints the same as
+     every other: the row's numbers go accent, which is what says it was won, and
+     a diagonal that went with them would be saying it twice. */
+  background: var(--split-fill);
+}

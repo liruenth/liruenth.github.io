@@ -220,6 +220,57 @@ light mode.
   --mb-closed-text: var(--accent);
 }
 
+/* A round of a game that scores a plain number: the score above the diagonal
+   and the total it put the player on below it, drawn as two triangles that tile
+   the cell (round_split.css). The halves have to reach the cell's edges, so the
+   padding every other cell gets comes off here, the same as the Mormon Bridge
+   cell above.
+
+   Its own height and minimum width rather than the round cell's, since the job
+   isn't quite the same: two numbers each centred in its own triangle, in a column
+   narrow enough that seven of them plus a total still fit across a phone. */
+.stats-table td.stats-split-cell {
+  /* The page's own text colour, not the fixed grey the component defaults to —
+     this table follows the theme, so on a dark page the diagonal has to be drawn
+     out of the light the page is written in. */
+  --split-fill: color-mix(in srgb, var(--text-h) 9%, transparent);
+  /* The height twice over, once for the cell and once for the halves to centre
+     their text against — set from the one token, since the two being the same
+     number is the whole point of the component asking for it. */
+  --split-height: var(--stats-round-height);
+
+  padding: 0;
+  /* Wider than the Mormon Bridge cell, because both its numbers are centred in a
+     triangle rather than tucked into a corner: the middle of a triangle is a
+     third of the way in, so the diagonal is closer to the text than an edge
+     would be, and three digits need the room to clear it. */
+  min-width: 84px;
+  height: var(--split-height);
+}
+
+.stats-table td.stats-split-cell .split-round {
+  height: var(--split-height);
+  /* Bigger than the table's own text and than the three-wedge cell's, which both
+     hold more in the same room: two numbers to a cell can be read at the size
+     they'd be read at anywhere else. */
+  font-size: 17px;
+}
+
+/* The heading is the round and then which half of its cells is which, stacked
+   rather than split: it names both halves, so it belongs to neither. */
+.stats-table th.stats-split-head {
+  min-width: 84px;
+}
+
+.stats-table .stats-split-legend {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 400;
+  /* The round is what the column is; this only says how to read it */
+  opacity: 0.7;
+}
+
 /* An over- or underbid round's number, lifted for a dark page: the defaults in
    round_cell.css are picked for the sheet, which sits in a theme that's light
    whatever this page is, and on this background they'd both go muddy. */
