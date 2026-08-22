@@ -28,7 +28,14 @@ import {
   TOTAL_SOURCE
 } from '../common/sheetGrid';
 import RoundWedges from './RoundWedges';
-import { mbRowTotal, setCellValue, clampToRound, tricksIn } from '../../../helpers/mormonBridge';
+import {
+  activePlayers,
+  bidLean,
+  clampToRound,
+  mbRowTotal,
+  setCellValue,
+  tricksIn
+} from '../../../helpers/mormonBridge';
 import { positionsByTotal } from '../../../helpers/scoring';
 import { winsWith } from '../../../helpers/gameTypes';
 import './round_cell.css';
@@ -139,10 +146,14 @@ function PlayerCell({ data }) {
   );
 }
 
-// The same three wedges as a cell, so the columns read as what's under them:
-// which side is the bid, which the took, and the round across the bottom.
-function RoundHeader({ round }) {
-  return <RoundWedges heading bid="bid" took="took" score={round} />;
+/* The same three wedges as a cell, so the columns read as what's under them:
+   which side is the bid, which the took, and the round across the bottom.
+
+   The round number is coloured where the bidding didn't add up to it, and it's
+   asked for rather than handed over: see the note on getLean below for why the
+   answer can't ride in the column's params. */
+function RoundHeader({ round, getLean }) {
+  return <RoundWedges heading bid="bid" took="took" score={round} lean={getLean(round)} />;
 }
 
 // Greys out a player who's been removed. Static, since it reads the flag off the
@@ -186,6 +197,28 @@ const MormonBridgeTable = ({ scoreData, cols, setScoreData, disabledPlayers }) =
     setScoreData(new Map(scoreData));
   }, [scoreData, cols, setScoreData]);
 
+  /* Which rounds the table bid short of the tricks on the table, and which it bid
+     over — what the headings colour their round numbers with. Over the players
+     still in, since a removed one is out of the bidding, the same as the tally Auto
+     Step shows.
+
+     Read through a callback that never changes rather than passed in as a value,
+     because the headings belong to the columns: a lean in headerComponentParams
+     would rebuild every column def each time a cell was committed, and rebuilding
+     a column takes its cells' renderers with it — which is the focus, mid-tab from
+     a bid to the took beside it. So the columns hold still, and the effect below
+     puts the new answers where the callback reads them and then asks the headers
+     to redraw. Which means a heading is a repaint behind the sum until that effect
+     runs, and the first paint of all shows none — both of which are the same frame
+     the rest of the sheet catches up in. */
+  const leans = useMemo(() => {
+    const players = activePlayers(scoreData, disabledPlayers);
+    return new Map(cols.map((round) => [round, bidLean(players, scoreData, round)]));
+  }, [scoreData, cols, disabledPlayers]);
+
+  const leansRef = useRef(new Map());
+  const getLean = useCallback((round) => leansRef.current.get(round) ?? null, []);
+
   const columnDefs = useMemo(() => {
     const { playerCol, totalCol } = pinnedColumnDefs(smallScreen);
 
@@ -205,14 +238,14 @@ const MormonBridgeTable = ({ scoreData, cols, setScoreData, disabledPlayers }) =
         cellRendererParams: { onEnter, onCommit },
         headerClass: 'mb-round-header',
         headerComponent: RoundHeader,
-        headerComponentParams: { round },
+        headerComponentParams: { round, getLean },
         // The inputs own their keys — otherwise the grid takes the arrows for
         // moving between cells while someone is still typing into one.
         suppressKeyboardEvent: () => true
       })),
       totalCol
     ];
-  }, [cols, smallScreen, onEnter, onCommit]);
+  }, [cols, smallScreen, onEnter, onCommit, getLean]);
 
   /* Worked out here rather than in each row so the whole field is ranked once and
      the places agree with each other — a place is only meaningful next to the
@@ -238,11 +271,18 @@ const MormonBridgeTable = ({ scoreData, cols, setScoreData, disabledPlayers }) =
      The rows themselves have already been updated by the time it runs: the grid
      takes its new rowData in an effect of its own, and that's a child of this one.
      On the first pass there's no grid to ask yet, and typing into a cell doesn't
-     move the sheet's identity, so it can't pull the focus out of one. */
+     move the sheet's identity, so it can't pull the focus out of one.
+
+     The headings are asked for the same two reasons: a bid that's just gone in
+     changes what its round adds up to, and a player who's just been removed comes
+     out of the sum. Nothing in a header is focusable, so there's nothing there for
+     the redraw to lose. */
   const gridApi = useRef(null);
   useEffect(() => {
+    leansRef.current = leans;
     gridApi.current?.refreshCells({ force: true });
-  }, [disabledPlayers, scoreData]);
+    gridApi.current?.refreshHeader();
+  }, [leans, disabledPlayers, scoreData]);
 
   return (
     <SheetGrid
@@ -253,7 +293,14 @@ const MormonBridgeTable = ({ scoreData, cols, setScoreData, disabledPlayers }) =
       headerHeight={MB_HEADER_HEIGHT}
       defaultColDef={NO_REORDER}
       rowClassRules={rowClassRules}
-      onGridReady={(event) => { gridApi.current = event.api; }}
+      /* The headings are drawn before the effect above has anywhere to put the
+         leans, so a sheet picked back up mid-game would open with its round
+         numbers uncoloured. Asked for again here, which covers it whichever way
+         round the two happen to land. */
+      onGridReady={(event) => {
+        gridApi.current = event.api;
+        event.api.refreshHeader();
+      }}
     />
   );
 }

@@ -10,13 +10,19 @@ import './round_cell.css'
    inputs there, so mormon_bridge_table.jsx builds its own out of the same classes.
 
    Blanks stay blank. A round that was never played has no bid, no took and no
-   score, and a zero in any of them would read as one that was. */
-function RoundWedges({ bid, took, score, heading = false }) {
+   score, and a zero in any of them would read as one that was.
+
+   `lean` colours the score wedge, and is how the headings say a round the table
+   bid short of or over — see bidLean in helpers/mormonBridge.js for which way
+   round, and round_cell.css for the colours. */
+function RoundWedges({ bid, took, score, heading = false, lean = null }) {
   return (
     <div className={heading ? 'mb-round mb-round-heading' : 'mb-round'}>
       <span className="mb-wedge mb-wedge-bid">{bid ?? ''}</span>
       <span className="mb-wedge mb-wedge-took">{took ?? ''}</span>
-      <span className="mb-wedge mb-wedge-score">{score ?? ''}</span>
+      <span className={lean ? `mb-wedge mb-wedge-score mb-bid-${lean}` : 'mb-wedge mb-wedge-score'}>
+        {score ?? ''}
+      </span>
     </div>
   );
 }

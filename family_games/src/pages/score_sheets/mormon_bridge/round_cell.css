@@ -24,6 +24,8 @@ StatsTable.css.
 :root {
   --mb-closed-fill: rgba(0, 0, 0, 0.07);
   --mb-closed-text: rgba(0, 0, 0, 0.75);
+  --mb-under-text: #1565c0;
+  --mb-over-text: #c62828;
 }
 
 .mb-round {
@@ -139,6 +141,27 @@ span.mb-wedge-score {
   justify-content: center;
   padding: 0 0 4px;
   color: var(--mb-closed-text);
+}
+
+/* A round the table didn't bid the tricks of. Blue for short of them and red for
+   over, which is the direction the arithmetic went rather than a verdict on it:
+   both are ordinary rounds, and the one they're read against is the round that
+   adds up and stays the colour of every other number on the table.
+
+   Only ever on a heading in practice — the round number is the one the sum is
+   against — but stated on the wedge rather than the heading, since the wedge is
+   what carries the colour it's overriding.
+
+   The colours default to light ones for the same reason --mb-closed-text does:
+   the sheet's grid stays in Balham's light theme whatever the page is doing. The
+   stats table follows the page, and lifts them for a dark one — see
+   StatsTable.css. */
+span.mb-wedge-score.mb-bid-under {
+  color: var(--mb-under-text);
+}
+
+span.mb-wedge-score.mb-bid-over {
+  color: var(--mb-over-text);
 }
 
 /* A heading says which side is which rather than carrying a value, so the labels

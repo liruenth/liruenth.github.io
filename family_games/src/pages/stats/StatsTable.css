@@ -219,3 +219,13 @@ light mode.
 .stats-table .is-winner .stats-round-cell {
   --mb-closed-text: var(--accent);
 }
+
+/* An over- or underbid round's number, lifted for a dark page: the defaults in
+   round_cell.css are picked for the sheet, which sits in a theme that's light
+   whatever this page is, and on this background they'd both go muddy. */
+@media (prefers-color-scheme: dark) {
+  .stats-table .stats-round-cell {
+    --mb-under-text: #64b5f6;
+    --mb-over-text: #ef5350;
+  }
+}

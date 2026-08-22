@@ -1,6 +1,7 @@
 import './StatsTable.css'
 import { formatDate, titleCase } from '../../helpers/statsData'
 import { gameTypeLabel, roundCellFor } from '../../helpers/gameTypes'
+import { bidLean } from '../../helpers/mormonBridge'
 import RoundWedges from '../score_sheets/mormon_bridge/RoundWedges'
 
 /* The one glyph in the app that isn't a character. The house style is HTML
@@ -77,8 +78,20 @@ function GameTable({ game, onEdit }) {
               <th scope="col" className="stats-table-name">Player</th>
               {rounds.map((round) => (
                 <th scope="col" key={round} className={roundCellClass}>
+                  {/* The round number is coloured where the table didn't bid the
+                      tricks that were on it — see bidLean. Every player is offered,
+                      including any who was removed: a round they were already out
+                      of was never written, so they hold no cell in it to count. */}
                   {bidTook
-                    ? <RoundWedges heading bid="bid" took="took" score={round} />
+                    ? (
+                      <RoundWedges
+                        heading
+                        bid="bid"
+                        took="took"
+                        score={round}
+                        lean={bidLean(order, scores, round)}
+                      />
+                    )
                     : round}
                 </th>
               ))}

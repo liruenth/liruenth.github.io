@@ -205,6 +205,52 @@ export function mbRowTotal(playerRounds, cols) {
 }
 
 
+/* How a round's bidding came out against the tricks on the table: 'under' when
+   the table called for fewer than there are, 'over' when it called for more, and
+   null when it called for exactly them.
+
+   Both tables colour the round number with it, which is the point of it: an
+   overbid round has somebody in it who must be set and an underbid one has a
+   trick going spare, and that reads better at the top of the column than it does
+   added up by hand across the row.
+
+   Null too while a round is still being called, because a round only half bid is
+   under by definition and a column that said so from the first bid would be
+   saying nothing. A player with no cell at all is passed over rather than counted
+   as still to call: that's how the stats page holds a round somebody had already
+   been removed before, since an unplayed round is never written (buildScoreRows
+   in api/routes.js). The sheet seeds every round of every player, so there it's
+   the caller that passes the players still in. */
+export function bidLean(players, scores, round) {
+  let called = 0;
+  let counted = 0;
+
+  for (const player of players) {
+    const cell = scores.get(player)?.get(round);
+    if (!cell) {
+      continue;
+    }
+    if (isBlank(cell, 'bid')) {
+      return null;
+    }
+
+    called += Number(cell.bid);
+    counted += 1;
+  }
+
+  if (counted === 0) {
+    return null;
+  }
+
+  const left = tricksIn(round) - called;
+  if (left === 0) {
+    return null;
+  }
+
+  return left > 0 ? 'under' : 'over';
+}
+
+
 /* ---------------------------------------------------------------------------
    Auto Step: walking the sheet a cell at a time, in the order the game is played.
 
