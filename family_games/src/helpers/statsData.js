@@ -234,6 +234,12 @@ function buildGame(gameId, type, game) {
        see helpers/editGame.js. */
     seated,
     winners,
+    /* Who played the game out. Not everyone at the table did, and the difference
+       matters past the winner: a player who left has a total of the rounds they
+       played, which isn't a low total but a short one, and the boards would take
+       it for a personal best. So they count the game for whoever finished it —
+       see addGame. */
+    finishers: [...finishers],
     /* Nobody played the last round, so nobody won it. It still shows on the page
        with everything that was scored in it — it just isn't a result, so it's kept
        out of what the player boards count and can be filtered for on its own. */
@@ -359,15 +365,20 @@ function record(current, value, game, better) {
    the type's round list, since that lists every round of the game whether it was
    reached or not — a game that ended early would be read as rounds of undefined. */
 function addGame(stats, game, player, bidTook) {
-  /* A game nobody finished is no result, so it counts for nothing that reads as
-     one: not as a game played, not against the win rate, and not as a total. A
-     total from a game that was abandoned isn't a low total, it's a short one, and
-     it would take the Lowest Total column off whoever really holds it.
+  /* A game this player didn't see out is no result of theirs, so it counts for
+     nothing that reads as one: not as a game played, not against the win rate, and
+     not as a total. A total off half a game isn't a low total, it's a short one,
+     and it would take the Lowest Total column off whoever really holds it.
+
+     Asked per player rather than of the game, because the two come apart: a game
+     everybody finished bar one counts for everybody but them. A game nobody
+     finished has nobody in `finishers`, so it counts for no one — which is the
+     game-level rule falling out of the same test rather than needing its own.
 
      The rounds are a different matter. They were played, whatever became of the
      game around them, so a score, a bid or a took set in one still stands as the
      best somebody has managed. */
-  if (!game.unfinished) {
+  if (game.finishers.includes(player)) {
     const total = game.totals.get(player);
 
     stats.gamesPlayed += 1;
@@ -454,10 +465,11 @@ function boardRows(type, byPlayer) {
   const ahead = winsWith(type) === 'high' ? -1 : 1;
 
   /* A player can be on the board having played nothing that counted: every game
-     they were in was abandoned, and they're here for a round record set in one of
-     them. Neither rate means anything over no games, so the average is left blank
-     rather than worked out of nought — see PlayerBoard, which renders it as the
-     empty cell a record with no value gets. */
+     they were in was abandoned, or they left every one of them before the end,
+     and they're here for a round record set in one. Neither rate means anything
+     over no games, so the average is left blank rather than worked out of nought
+     — see PlayerBoard, which renders it as the empty cell a record with no value
+     gets. */
   return [...byPlayer.values()]
     .map(({ totalPoints, ...stats }) => ({
       ...stats,
