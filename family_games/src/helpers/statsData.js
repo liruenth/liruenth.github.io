@@ -16,8 +16,15 @@ import { rowTotal, sortedByTotal } from './scoring';
 import { mbRowTotal, mbRounds, mbStartingRound } from './mormonBridge';
 import { roundsFor, winsWith, roundCellFor, rowOrderFor, GAME_TYPE_IDS } from './gameTypes';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/* Spelled out, and cut to three letters where the short form is wanted — which
+   works out for all twelve, so there's one list rather than two that have to be
+   kept saying the same thing. */
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+
+// Sunday first, which is the week getDay counts from.
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
+  'Saturday'];
 
 // Names are stored shouting, which is not how anyone wants to read a roster.
 export function titleCase(name) {
@@ -32,7 +39,33 @@ export function formatDate(date) {
   const name = MONTHS[Number(month) - 1];
 
   // A date the store shouldn't hold but might is better shown raw than dropped
-  return name && year && day ? `${name} ${Number(day)}, ${year}` : String(date ?? '');
+  return name && year && day
+    ? `${name.slice(0, 3)} ${Number(day)}, ${year}`
+    : String(date ?? '');
+}
+
+/* The same date spelled out, with the day of the week on the front — for where
+   the date is a heading rather than one field of a line. A game is remembered by
+   the evening it was played on at least as much as by its date, and the weekday is
+   the half of that the stored date doesn't say out loud.
+
+   Working the weekday out is the one thing here that needs a Date, and it's built
+   from the three numbers rather than from the string for exactly the reason
+   formatDate takes the string apart in the first place: new Date('2025-06-22') is
+   midnight UTC, which is the evening before for anyone west of it, and would name
+   the wrong day of the week. Handed numbers, Date works in local time.
+
+   Falls back to the short form rather than to nothing, so a date too odd to name a
+   weekday for still reads as the date it is — and that falls back to the raw
+   string in its turn. */
+export function formatLongDate(date) {
+  const [year, month, day] = String(date ?? '').split('-');
+  const name = MONTHS[Number(month) - 1];
+  const weekday = DAYS[new Date(Number(year), Number(month) - 1, Number(day)).getDay()];
+
+  return name && year && day && weekday
+    ? `${weekday} ${name} ${Number(day)}, ${year}`
+    : formatDate(date);
 }
 
 // A number the row didn't carry reads back blank, not zero — a round nobody bid

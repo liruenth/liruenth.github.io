@@ -1,5 +1,5 @@
 import './StatsTable.css'
-import { formatDate, titleCase } from '../../helpers/statsData'
+import { formatLongDate, titleCase } from '../../helpers/statsData'
 import { gameTypeLabel, roundCellFor } from '../../helpers/gameTypes'
 import { bidLean } from '../../helpers/mormonBridge'
 import { runningTotals } from '../../helpers/scoring'
@@ -58,7 +58,7 @@ function GameTable({ game, onEdit }) {
   return (
     <article className="game-block">
       <h2>
-        {formatDate(date)}{gameNumber ? ` · Game ${gameNumber}` : ''}
+        {formatLongDate(date)}{gameNumber ? ` · Game ${gameNumber}` : ''}
         <span className="game-type">{gameTypeLabel(type)}</span>
         {/* Nobody played the last round, so no row below is a winning one. Said
             here rather than left to be inferred from a table with nothing
@@ -67,12 +67,15 @@ function GameTable({ game, onEdit }) {
         {/* Shown on hover, and on focus so it can be reached without a pointer —
             see .game-edit in StatsTable.css. Inside the heading rather than beside
             it because that's what it names, which does mean its label is read as
-            part of the heading: hence a short one that says which game. */}
+            part of the heading: hence one that says no more than which game, and
+            says it in the heading's own words. A label that named the day
+            differently from the line above it would be naming a different game to
+            anyone reading the two, or saying one of them to a voice control. */}
         {onEdit && (
           <button
             type="button"
             className="game-edit"
-            aria-label={`Edit ${formatDate(date)}${gameNumber ? ` game ${gameNumber}` : ''}`}
+            aria-label={`Edit ${formatLongDate(date)}${gameNumber ? ` game ${gameNumber}` : ''}`}
             onClick={() => onEdit(game)}
           >
             <PencilIcon />
