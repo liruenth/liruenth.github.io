@@ -1,3 +1,6 @@
+# Possible improvements?
+- improve name selection somehow
+
 # Family Games
 
 Score sheets for Contract Rummy and Mormon Bridge, plus a stats page over the

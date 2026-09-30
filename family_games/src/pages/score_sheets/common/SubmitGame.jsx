@@ -1,11 +1,40 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import ConfirmModal from './ConfirmModal'
 
-function SubmitGame({ scores, onSubmit, onSelect, onSubmitted }) {
+/* `autoPrompt` is the sheet saying the game looks finished — the last round is
+   in for everyone still playing. What it's for is the submit nobody remembers to
+   make: the scoring is over, the players have got up, and the sheet sits there
+   until the next game clears it.
+
+   The item itself is unchanged by it. This only opens the confirmation the item
+   would have opened, so there's one thing to say no to and it's the same one. */
+function SubmitGame({ scores, onSubmit, onSelect, onSubmitted, autoPrompt = false }) {
   const [confirming, setConfirming] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showingReceipt, setShowingReceipt] = useState(false);
+
+  /* Asked once and then never again, because a game that's been played to the
+     end goes on looking finished: every correction made afterwards would ask
+     again, and the answer to the second one is already known.
+
+     Seeded with the flag rather than with false, so a sheet that arrives finished
+     isn't asked at all — a game opened back up from the stats page to be edited
+     is complete the moment it's on screen, and the ask would land before the
+     reason for the edit had been typed. It's a prompt for a game finishing, and
+     that one finished some time ago.
+
+     A ref rather than state: nothing renders differently for having asked, and
+     a new game gets a new sheet component, which is a new ref. */
+  const prompted = useRef(autoPrompt);
+  useEffect(() => {
+    if (!autoPrompt || prompted.current) {
+      return;
+    }
+
+    prompted.current = true;
+    setConfirming(true);
+  }, [autoPrompt]);
 
   const submit = async () => {
     setConfirming(false);

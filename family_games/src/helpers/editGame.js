@@ -16,7 +16,7 @@ import { bumpGameId, gameSubmitted } from './gameId';
 import { GROUPS_KEY, saveGroups } from './groups';
 import { STARTING_ROUND_KEY } from './startingRound';
 import { saveSheet, clearSheet } from './sheetStorage';
-import { emptyCell } from './mormonBridge';
+import { blankRounds } from './mormonBridge';
 import { roundCellFor } from './gameTypes';
 import { REMOVED_KEYS } from '../pages/score_sheets/common/removedPlayers';
 
@@ -84,7 +84,7 @@ function rebuildSheet(game) {
       return [player, new Map(played)];
     }
 
-    const rounds = new Map(game.rounds.map((round) => [round, emptyCell()]));
+    const rounds = blankRounds(game.rounds);
     for (const [round, cell] of played) {
       rounds.set(round, { ...cell });
     }

@@ -4,9 +4,9 @@ import './RemovePlayerModal.css'
 /* Takes players out of play without taking them off the sheet.
 
    A toggle list rather than a one-way remove: the sheet keeps a removed player's
-   row and the rounds they did play, so putting them back is a real thing to want —
-   and Mormon Bridge, which has this action but no Add Player, has nothing else to
-   undo a mis-tap with.
+   row and the rounds they did play, so putting them back is a real thing to want,
+   and Add Player is no way to do it — that seats them again from scratch, with
+   the rounds they did play gone.
 
    Nothing is applied until Save, so the whole list is one decision. */
 function RemovePlayerModal({ players, removed, onSave, onClose }) {

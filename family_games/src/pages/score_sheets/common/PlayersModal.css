@@ -1,0 +1,117 @@
+/* The dialog shell, same as the other sheet modals. .modal-hint comes from
+   RemovePlayerModal.css and .modal-error / .modal-actions from
+   AddPlayerModal.css, both of which define them unprefixed as shared modal
+   classes.
+
+   The list is its own, rather than the wrapping .player-list the roster screen
+   and Remove Player share: those are names to tap, laid out as a run of chips,
+   and these are fields to type into with a pair of arrows beside them — which
+   only reads as a seating order if it's a column. */
+
+.players-modal {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  min-width: 280px;
+  max-width: min(440px, 90vw);
+}
+
+.players-modal::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.players-modal h2 {
+  margin-top: 0;
+}
+
+.players-modal form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+/* Capped and scrolled: a big table is ten rows of this, and a dialog taller than
+   the screen would put Save off the bottom of it. */
+.players-edit-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(50svh, 400px);
+  overflow-y: auto;
+}
+
+.players-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.players-edit-row input[type='text'] {
+  font: inherit;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.players-edit-row input[type='text']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The pair moves as one thing — it's one control with two ends — so they're
+   butted together and rounded on the outside only. */
+.players-edit-move {
+  display: inline-flex;
+  flex: none;
+}
+
+.players-edit-move button {
+  font: inherit;
+  font-size: 12px;
+  /* Thumb-sized however small the glyph in it is: this is the control the whole
+     dialog is for on a phone. */
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.players-edit-move button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.players-edit-move button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.players-edit-move button:hover:not(:disabled) {
+  border-color: var(--accent-border);
+}
+
+.players-edit-move button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The top row's up and the bottom row's down. Left in place rather than hidden,
+   so the rows stay the same width as each other and nothing shifts sideways as a
+   player is walked up the list. */
+.players-edit-move button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
