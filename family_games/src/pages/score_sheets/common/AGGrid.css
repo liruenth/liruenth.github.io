@@ -50,6 +50,17 @@
 /* There isn't room for a horizontal scrollbar on a small screen, so drop it and
    give the strip it reserved back to the rows — swipe still scrolls the sheet. */
 @media (max-width: 1024px) {
+  /* Balham keeps 8px either side of a cell, which on a column this narrow is a
+     third of the room a name has to be read in. Half of it back is a character,
+     which is small beside what measuring the column gains (playerColumnWidth in
+     sheetGrid.js) — but it's a character the rounds don't pay for, and the two
+     are the same decision: the cell stops being sized for a desktop. */
+  .grid-container .ag-cell.sheet-player-cell,
+  .grid-container .ag-header-cell.sheet-player-cell {
+    --ag-cell-horizontal-padding: 4px;
+    padding-inline: 4px;
+  }
+
   .grid-container :is(
     .ag-grid-viewport,
     .ag-grid-scrollable-area,

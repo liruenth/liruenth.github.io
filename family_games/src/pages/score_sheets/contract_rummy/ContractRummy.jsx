@@ -150,7 +150,7 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onSubmit
               className="actions-menu-item"
               onClick={() => { setEditingPlayers(true); closeMenu(); }}
             >
-              Players
+              Edit Players
             </button>
             <button
               type="button"

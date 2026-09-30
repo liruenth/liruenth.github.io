@@ -134,7 +134,7 @@ function MormonBridge({players, scoreData, setScoreData, onSubmitGame, onSubmitt
               className="actions-menu-item"
               onClick={() => { setEditingPlayers(true); closeMenu(); }}
             >
-              Players
+              Edit Players
             </button>
             <button
               type="button"

@@ -110,7 +110,7 @@ function PlayersModal({ players, reorderable = false, onSave, onClose }) {
   return (
     <dialog ref={dialogRef} className="players-modal" onClose={onClose}>
       <form onSubmit={save}>
-        <h2>Players</h2>
+        <h2>Edit Players</h2>
         <p className="modal-hint">
           {reorderable
             ? 'Renaming a player keeps their scores. The rows are the seating, so moving one moves where they bid.'

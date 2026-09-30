@@ -12,7 +12,9 @@ import SheetGrid from '../common/AGGrid';
 import {
   buildRows,
   pinnedColumnDefs,
+  playerColumnWidth,
   useSmallScreen,
+  NO_REORDER,
   MANUAL_SOURCES,
   TOTAL_SOURCE
 } from '../common/sheetGrid';
@@ -43,8 +45,13 @@ const ContractRummyTable = ({
 }) => {
   const smallScreen = useSmallScreen();
 
+  /* A number rather than the roster, so the columns are rebuilt when a name
+     changes rather than on every render — see playerColumnWidth in
+     common/sheetGrid.js. */
+  const playerWidth = playerColumnWidth(smallScreen, [...scoreData.keys()]);
+
   const columnDefs = useMemo(() => {
-    const { playerCol, totalCol } = pinnedColumnDefs(smallScreen);
+    const { playerCol, totalCol } = pinnedColumnDefs(smallScreen, playerWidth);
 
     return [
       playerCol,
@@ -63,7 +70,7 @@ const ContractRummyTable = ({
       })),
       totalCol
     ];
-  }, [cols, smallScreen]);
+  }, [cols, smallScreen, playerWidth]);
 
   /* Keyed on the Map's identity, which changes when the roster or the row order
      does — so adding a player or re-ranking rebuilds the rows, while cell edits
@@ -141,6 +148,7 @@ const ContractRummyTable = ({
       columnDefs={columnDefs}
       rowData={rowData}
       getRowId={getRowId}
+      defaultColDef={NO_REORDER}
       rowClassRules={rowClassRules}
       onCellValueChanged={onCellValueChanged}
     />

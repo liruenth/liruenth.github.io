@@ -24,7 +24,9 @@ import SheetGrid from '../common/AGGrid';
 import {
   buildRows,
   pinnedColumnDefs,
+  playerColumnWidth,
   useSmallScreen,
+  NO_REORDER,
   TOTAL_SOURCE
 } from '../common/sheetGrid';
 import RoundWedges from './RoundWedges';
@@ -49,14 +51,6 @@ import './mormon_bridge_table.css';
    The header carries the same three wedges, so it's the same height. */
 const MB_ROW_HEIGHT = 52;
 const MB_HEADER_HEIGHT = 52;
-
-/* Nothing the grid does may reorder the sheet: the rows are in seating order,
-   which is what makes the bidding read left to right, and it's also what Auto
-   Step walks. So no sorting, and no dragging a column out of the countdown
-   either. A seat that has actually changed is said outright in the Players modal
-   — see MormonBridge.jsx — which is a different thing from the grid quietly
-   ranking the table under whoever is typing into it. */
-const NO_REORDER = { sortable: false, suppressMovable: true };
 
 /* A round cell. The wedges render straight off the cell object rather than
    mirroring it into state, so there's one copy of a bid and it's the one that
@@ -145,9 +139,15 @@ function RoundCell({ data, value, colDef, node, onEnter, onCommit, getOverTaken,
 }
 
 /* The player's name with where they stand beside it, so the sheet says who's
-   winning without moving anyone: the rows are the seating and can't be reordered
-   — see the note above NO_REORDER — which is the whole reason the position has to
-   be written on the row rather than shown by it.
+   winning without moving anyone.
+
+   The rows here are the seating — the order the bidding goes round, and what
+   Auto Step walks — so nothing the grid does may reorder them: see NO_REORDER in
+   common/sheetGrid.js, which both sheets pass. Which is the whole reason the
+   place has to be written on the row rather than shown by it. (A seat that has
+   really changed is said outright in the Players modal — see MormonBridge.jsx —
+   which is a different thing from the grid ranking the table under whoever is
+   typing into it.)
 
    A superscript rather than a column of its own: it's read alongside the name,
    and the pinned column is already the narrowest thing on a phone. */
@@ -190,6 +190,12 @@ const rowClassRules = { 'mb-row-disabled': (params) => !!params.data?.disabled }
 
 const MormonBridgeTable = ({ scoreData, cols, setScoreData, disabledPlayers }) => {
   const smallScreen = useSmallScreen();
+
+  /* A number rather than the roster, so the columns are rebuilt when a name
+     changes rather than on every render — see playerColumnWidth in
+     common/sheetGrid.js. Rebuilding a column here takes its two inputs with it,
+     so "every render" would mean losing the cursor on every commit. */
+  const playerWidth = playerColumnWidth(smallScreen, [...scoreData.keys()]);
 
   /* Writes the entered value into the sheet and re-scores the round — through the
      same helper Auto Step writes with, so the two ways of entering a bid can't
@@ -319,7 +325,7 @@ const MormonBridgeTable = ({ scoreData, cols, setScoreData, disabledPlayers }) =
   });
 
   const columnDefs = useMemo(() => {
-    const { playerCol, totalCol } = pinnedColumnDefs(smallScreen);
+    const { playerCol, totalCol } = pinnedColumnDefs(smallScreen, playerWidth);
 
     return [
       // The position rides on the row rather than in these params, so a re-scored
@@ -344,7 +350,7 @@ const MormonBridgeTable = ({ scoreData, cols, setScoreData, disabledPlayers }) =
       })),
       totalCol
     ];
-  }, [cols, smallScreen, onEnter, onCommit, getLean, getOverTaken, watchRound]);
+  }, [cols, smallScreen, playerWidth, onEnter, onCommit, getLean, getOverTaken, watchRound]);
 
   /* Worked out here rather than in each row so the whole field is ranked once and
      the places agree with each other — a place is only meaningful next to the
