@@ -92,10 +92,22 @@ light mode.
 }
 
 /* Seven rounds plus a total is wider than a phone, so the table scrolls inside
-   its own box rather than taking the page sideways with it. */
+   its own box rather than taking the page sideways with it.
+
+   Bounded downwards as well, which is what the sticky heading row below needs:
+   sticky is measured against the nearest scrolling box, and this was already that
+   box — overflow-y computes to auto once overflow-x isn't visible — but with no
+   height to scroll within, so a heading pinned to its top never had anywhere to
+   be pinned from.
+
+   A table shorter than the screen is unaffected: it never reaches the cap, so
+   nothing scrolls here and the page goes on scrolling as it did. A longer one now
+   takes over once it fills the screen, which is the point at which its headings
+   would otherwise have gone. */
 .stats-table-scroll {
-  overflow-x: auto;
+  overflow: auto;
   max-width: 100%;
+  max-height: calc(100svh - 16px);
 }
 
 .stats-table {
@@ -125,11 +137,24 @@ light mode.
   font-weight: 400;
 }
 
-/* --code-bg, not --social-bg: the latter is half-transparent, which a heading
-   row that stays put while the table scrolls under it cannot be. */
+/* What the columns are stays put while the players scroll past.
+
+   --code-bg, not --social-bg: the latter is half-transparent, which a heading row
+   the table scrolls under cannot be.
+
+   The borders are drawn again as inset shadows because the table's borders are
+   collapsed, and a collapsed border belongs to the table rather than to the cell
+   — so it stays where it was drawn while the cell it belongs to travels. Only
+   this row needs it; everything else here holds still. */
 .stats-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   font-weight: 500;
   background: var(--code-bg);
+  box-shadow:
+    inset 0 1px 0 var(--border),
+    inset 0 -1px 0 var(--border);
 }
 
 /* Whose row it is stays put while the rounds scroll past */
@@ -140,8 +165,9 @@ light mode.
   text-align: left;
 }
 
+/* The corner the two meet in, over both of them */
 .stats-table thead .stats-table-name {
-  z-index: 2;
+  z-index: 3;
 }
 
 .stats-table .stats-table-total {
@@ -156,6 +182,66 @@ light mode.
 .stats-table .is-winner td {
   color: var(--accent);
   background-image: linear-gradient(var(--accent-bg), var(--accent-bg));
+}
+
+/* A column heading you can sort on, which is every heading of a player board and
+   none of a game table — hence the class, since both tables are drawn by the
+   rules above.
+
+   The padding comes off the cell and goes onto the button, the same way a record
+   cell hands its over: a heading is a small enough target already without the
+   clickable part of it being smaller still. */
+.stats-table thead th.stats-sort-cell {
+  padding: 0;
+}
+
+.stats-table .stats-sort {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 12px;
+  font: inherit;
+  font-weight: inherit;
+  /* The name column reads left and the rest centre, which is the cell's business
+     rather than the button's */
+  text-align: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* The one the table is sorted by, said in the page's own colour rather than only
+   by the arrow — the arrow is four pixels of glyph at the end of a row of
+   headings that all look alike. */
+.stats-table .stats-sort.is-sorted {
+  color: var(--accent);
+}
+
+/* Drawn inside its own edge, for the same reason the record button's ring is:
+   the cell has no padding left to hold an outward one. */
+.stats-table .stats-sort:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Held open whether or not it has an arrow in it, so a column doesn't change
+   width as it's sorted and shift the table under the cursor. */
+.stats-table .stats-sort-arrow {
+  flex: none;
+  width: 0.75em;
+  font-size: 0.75em;
+  text-align: left;
+}
+
+/* The name column's heading is the sticky corner, and its button is pushed
+   against the left edge by the cell's own alignment — so its arrow goes on the
+   far side of the name rather than trailing off into the column's spare width. */
+.stats-table .stats-table-name .stats-sort {
+  justify-content: flex-start;
 }
 
 /* A record on a player board, and the way into the game it was set in. The

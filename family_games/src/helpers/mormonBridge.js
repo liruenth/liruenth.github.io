@@ -176,6 +176,18 @@ export function setCellValue(scores, player, round, field, value) {
   return cell;
 }
 
+/* One player's row, every round of it blank. The three places that need a row
+   they can play a whole game on all build it this way: a new sheet below, a
+   finished game rebuilt for editing (rebuildSheet in helpers/editGame.js), and a
+   player added to a game already under way.
+
+   The rounds are handed over rather than worked out, because two of those three
+   are filling in a game whose rounds already exist — including any repeat marks
+   it opened on, which no round count of its own would reproduce. */
+export function blankRounds(rounds) {
+  return new Map(rounds.map((round) => [round, emptyCell()]));
+}
+
 /* A new sheet: every player, every round, all blank. Seeded in full rather than
    filled in as rounds are played, so nothing downstream has to cope with a round
    that isn't there yet — the cell renderer always has a cell, Auto Step can walk
@@ -188,10 +200,7 @@ export function setCellValue(scores, player, round, field, value) {
 export function emptySheet(players, start = MB_ROUNDS_IN_GAME) {
   const rounds = mbRounds(start);
 
-  return new Map(players.map((player) => [
-    player,
-    new Map(rounds.map((round) => [round, emptyCell()]))
-  ]));
+  return new Map(players.map((player) => [player, blankRounds(rounds)]));
 }
 
 /* A player's running total. Same shape of job as rowTotal in scoring.js and the
@@ -348,4 +357,53 @@ export function bidTally(players, scores, round) {
   }
 
   return { left: tricksIn(round) - bid, remaining };
+}
+
+/* The same tally for the other half of the round: how many tricks are still
+   unaccounted for, and how many players have yet to say what they took.
+
+   Two things read it. Auto Step shows `left` as the tricks still out there, which
+   is the number the scorer is holding in their head anyway. And the sheet marks a
+   round where it has gone negative — the bidding can be over the tricks on the
+   table and usually is, but the taking cannot: those tricks don't exist, so
+   somebody has been written down wrong.
+
+   Unlike bidLean it answers from the first entry rather than waiting for the
+   round to be called in full. An overbid round is only overbid once everyone has
+   bid, but a round with more tricks taken than were dealt is wrong the moment it
+   is, and that's the point of looking. */
+export function tookTally(players, scores, round) {
+  let taken = 0;
+  let remaining = 0;
+
+  for (const player of players) {
+    const cell = scores.get(player)?.get(round);
+    if (isBlank(cell, 'took')) {
+      remaining += 1;
+    } else {
+      taken += Number(cell.took);
+    }
+  }
+
+  return { left: tricksIn(round) - taken, remaining };
+}
+
+/* Whether everyone still in has played a round out — both halves of it, since one
+   without the other is a round still being played. The same rule
+   firstUnfinishedRound above walks the sheet by.
+
+   columnComplete in helpers/scoring.js is the same question of a Contract Rummy
+   sheet, and can't answer this one: a Mormon Bridge sheet seeds every round of
+   every player up front, so its cells are never missing and that check would call
+   the round finished from the first paint. */
+export function mbColumnComplete(scores, round, removed) {
+  const playing = activePlayers(scores, removed);
+  if (playing.length === 0) {
+    return false;
+  }
+
+  return playing.every((player) => {
+    const cell = scores.get(player)?.get(round);
+    return !!cell && !isBlank(cell, 'bid') && !isBlank(cell, 'took');
+  });
 }

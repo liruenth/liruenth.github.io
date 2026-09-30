@@ -26,6 +26,7 @@ StatsTable.css.
   --mb-closed-text: rgba(0, 0, 0, 0.75);
   --mb-under-text: #1565c0;
   --mb-over-text: #c62828;
+  --mb-over-fill: rgba(198, 40, 40, 0.16);
 }
 
 .mb-round {
@@ -116,6 +117,28 @@ input.mb-wedge:focus {
   background: rgba(38, 112, 216, 0.16);
 }
 
+/* A round with more tricks taken in it than were ever dealt. Every took in the
+   column is marked, the heading's label included, because which of them is wrong
+   is the one thing the sheet can't work out — only that one of them is.
+
+   The fill is clipped to the wedge's own triangle like every other background
+   here, so what it draws is a red corner rather than a red box.
+
+   The focus tint above still wins over it — it's the more specific of the two —
+   which leaves the wedge with the cursor in it the one took in the column that
+   isn't red. That's the right way round: it's the one whose number is still being
+   decided. */
+.mb-wedge-took.mb-took-over {
+  color: var(--mb-over-text);
+  background: var(--mb-over-fill);
+}
+
+/* Disabled inputs fade their text, and this one is being pointed at */
+input.mb-wedge-took.mb-took-over:disabled {
+  opacity: 1;
+  -webkit-text-fill-color: var(--mb-over-text);
+}
+
 /* Text rather than an input — the stats page's cells, and both tables' headings.
    Placed rather than padded into position: each wedge is a flex box aligned into
    its own widest corner, which needs no row height to work from. */
@@ -170,6 +193,13 @@ span.mb-wedge-score.mb-bid-over {
 .mb-round-heading span.mb-wedge-took {
   font-size: 0.7em;
   opacity: 0.75;
+}
+
+/* Faded is what a label is; a label that's reporting something is not. Undoes
+   the rule above for the one heading in the row that has something to say. */
+.mb-round-heading span.mb-wedge-took.mb-took-over {
+  opacity: 1;
+  font-weight: 700;
 }
 
 .mb-round-heading span.mb-wedge-score {

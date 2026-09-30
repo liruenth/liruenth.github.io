@@ -152,8 +152,9 @@ function StatsHeader({
           </select>
         </label>
 
-        {/* Ordering the stack of games says nothing about a table of players,
-            which is ranked by wins on its own. */}
+        {/* Ordering the stack of games says nothing about a table of players.
+            That opens ranked by wins and is reordered by its own headings, none
+            of which is a thing this list of options can say. */}
         {view === 'games' && (
           <label className="stats-filter">
             Order

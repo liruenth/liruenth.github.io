@@ -4,10 +4,17 @@ import ActionsMenu from '../common/ActionsMenu'
 import AddPlayerModal from '../common/AddPlayerModal'
 import ConfirmModal from '../common/ConfirmModal'
 import GroupsModal from '../common/GroupsModal'
+import PlayersModal from '../common/PlayersModal'
 import RemovePlayerModal from '../common/RemovePlayerModal'
 import SubmitGame from '../common/SubmitGame'
 import { useRemovedPlayers, CR_REMOVED_KEY } from '../common/removedPlayers'
-import { lastCompleteCol, averageTotal, sortedByTotal } from '../../../helpers/scoring'
+import {
+  columnComplete,
+  lastCompleteCol,
+  averageTotal,
+  sortedByTotal
+} from '../../../helpers/scoring'
+import { renamePlayers, renameRemoved } from '../../../helpers/roster'
 import { readGroups, saveGroups } from '../../../helpers/groups'
 import { roundsFor } from '../../../helpers/gameTypes'
 
@@ -21,6 +28,7 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onSubmit
   );
   const [removed, setRemoved, clearRemoved] = useRemovedPlayers(CR_REMOVED_KEY);
   const [addingPlayer, setAddingPlayer] = useState(false);
+  const [editingPlayers, setEditingPlayers] = useState(false);
   const [changingGroups, setChangingGroups] = useState(false);
   const [removingPlayer, setRemovingPlayer] = useState(false);
   const [startingNewGame, setStartingNewGame] = useState(false);
@@ -101,6 +109,26 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onSubmit
     replaceScores(autoSort ? sortedByTotal(next, cols, removed) : next);
   };
 
+  /* A mistyped name put right, which on a sheet keyed by name is a rebuild of it —
+     see helpers/roster.js. The removals go through the same list, since they're
+     held by name too and would otherwise stay pointing at a row that's gone.
+
+     The rows come back in the order they went in. Only the ranking moves rows
+     here, and only when a round finishes, so re-sorting on a rename would move
+     them for a change that isn't about where anyone stands. */
+  const savePlayers = (entries) => {
+    replaceScores(renamePlayers(scores, entries));
+    setRemoved(renameRemoved(removed, entries));
+  };
+
+  /* Every round is in for everyone still playing, which is the game over. The
+     submit item takes it and asks, once — see SubmitGame.jsx.
+
+     Worked out on each render rather than watched for: a cell edit hands a new
+     Map up to ScoreSheet, which renders this again, so there is nothing to
+     subscribe to that isn't already happening. */
+  const finished = columnComplete(scores, cols[cols.length - 1], removed);
+
   return (
     <>
       {/* Children get the closer so picking an item dismisses the menu. Submit
@@ -120,6 +148,13 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onSubmit
             <button
               type="button"
               className="actions-menu-item"
+              onClick={() => { setEditingPlayers(true); closeMenu(); }}
+            >
+              Edit Players
+            </button>
+            <button
+              type="button"
+              className="actions-menu-item"
               onClick={() => { setChangingGroups(true); closeMenu(); }}
             >
               Groups ({numGroups})
@@ -131,7 +166,13 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onSubmit
             >
               Remove Player{removed.size ? ` (${removed.size})` : ''}
             </button>
-            <SubmitGame scores={scores} onSubmit={onSubmitGame} onSubmitted={onSubmitted} onSelect={closeMenu}/>
+            <SubmitGame
+              scores={scores}
+              onSubmit={onSubmitGame}
+              onSubmitted={onSubmitted}
+              onSelect={closeMenu}
+              autoPrompt={finished}
+            />
             <button
               type="button"
               className="actions-menu-item is-destructive"
@@ -160,6 +201,13 @@ function ContractRummy({players, scoreData, setScoreData, onSubmitGame, onSubmit
           existingPlayers={[...scores.keys()]}
           onAdd={addPlayer}
           onClose={() => setAddingPlayer(false)}
+        />
+      }
+      {editingPlayers &&
+        <PlayersModal
+          players={[...scores.keys()]}
+          onSave={savePlayers}
+          onClose={() => setEditingPlayers(false)}
         />
       }
       {changingGroups &&

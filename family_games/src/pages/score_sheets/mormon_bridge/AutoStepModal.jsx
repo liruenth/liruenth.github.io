@@ -7,6 +7,7 @@ import {
   firstUnfinishedRound,
   nextBlankStep,
   setCellValue,
+  tookTally,
   tricksIn
 } from '../../../helpers/mormonBridge'
 import './AutoStepModal.css'
@@ -147,7 +148,19 @@ function AutoStepModal({ scores, cols, removed, onEntered, onClose }) {
     );
   }
 
-  const tally = step.field === 'bid' ? bidTally(players, scores, step.round) : null;
+  /* The arithmetic the scorer would otherwise be holding in their head, which is
+     a different sum for each half of the round: what's left to call for while the
+     bidding goes round, and how many tricks are still out there once it's being
+     played. Both are asked of the round as it stands, so both count down as the
+     answers go in.
+
+     A negative on the bidding is ordinary and is the point of showing it —
+     somebody is going to be set. A negative on the taking is not: those tricks
+     don't exist, so it's a sign of a misheard answer somewhere in the round, and
+     the sheet marks the column it's in. */
+  const tally = step.field === 'bid'
+    ? bidTally(players, scores, step.round)
+    : tookTally(players, scores, step.round);
 
   /* What they called for, to ask what they got against. The bids all go in before
      any took does, so by the time it's asked for there is one — bar a sheet
@@ -164,9 +177,16 @@ function AutoStepModal({ scores, cols, removed, onEntered, onClose }) {
     <dialog ref={dialogRef} className="auto-step-modal" onClose={onClose}>
       <form onSubmit={next}>
         <h2>{heading}</h2>
-        {/* Only the bidding needs the arithmetic: what's left to call for, and
-            how many are still to call — the one being asked included. */}
-        {tally && <p className="auto-step-tally">{tally.left} left for {tally.remaining}</p>}
+        {/* The bidding says how many are still to call as well as what's left to
+            call for — the one being asked included, so it reads "3 left for 5" to
+            the fifth-from-last bidder. The taking doesn't: everyone still in is
+            going to be asked, in order, so the count would be the same number
+            twice over. */}
+        <p className="auto-step-tally">
+          {step.field === 'bid'
+            ? `${tally.left} left for ${tally.remaining}`
+            : `Tricks Left: ${tally.left}`}
+        </p>
         <input
           ref={inputRef}
           className="auto-step-input"

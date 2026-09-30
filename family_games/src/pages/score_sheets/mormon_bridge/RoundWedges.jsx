@@ -14,12 +14,19 @@ import './round_cell.css'
 
    `lean` colours the score wedge, and is how the headings say a round the table
    bid short of or over — see bidLean in helpers/mormonBridge.js for which way
-   round, and round_cell.css for the colours. */
-function RoundWedges({ bid, took, score, heading = false, lean = null }) {
+   round, and round_cell.css for the colours.
+
+   `tookOver` reddens the took wedge, and is the sheet's heading saying the round
+   below it has been written down with more tricks taken than were ever dealt.
+   Off by default, which is what the stats page passes: a finished game is what it
+   is, and there is nothing to be done about a round in it now. */
+function RoundWedges({ bid, took, score, heading = false, lean = null, tookOver = false }) {
   return (
     <div className={heading ? 'mb-round mb-round-heading' : 'mb-round'}>
       <span className="mb-wedge mb-wedge-bid">{bid ?? ''}</span>
-      <span className="mb-wedge mb-wedge-took">{took ?? ''}</span>
+      <span className={tookOver ? 'mb-wedge mb-wedge-took mb-took-over' : 'mb-wedge mb-wedge-took'}>
+        {took ?? ''}
+      </span>
       <span className={lean ? `mb-wedge mb-wedge-score mb-bid-${lean}` : 'mb-wedge mb-wedge-score'}>
         {score ?? ''}
       </span>
